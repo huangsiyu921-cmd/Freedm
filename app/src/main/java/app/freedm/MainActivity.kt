@@ -42,6 +42,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -222,14 +226,56 @@ private fun AppRoot(scope: CoroutineScope) {
                 .fillMaxSize()
                 .padding(pad),
         ) {
-            when (tab) {
-                Tab.DOWNLOADS -> DownloadsScreen(scope = scope, onOpenDetail = { detailId = it })
-                Tab.BROWSE -> BrowseScreen()
-                Tab.SETTINGS -> SettingsScreen(
+            // All three tabs stay composed: tearing the browser down on every
+            // tab switch lost the open page, the tab list and the scroll state.
+            TabHost(visible = tab == Tab.DOWNLOADS, index = 0) {
+                DownloadsScreen(scope = scope, onOpenDetail = { detailId = it })
+            }
+            TabHost(visible = tab == Tab.BROWSE, index = 1) {
+                BrowseScreen()
+            }
+            TabHost(visible = tab == Tab.SETTINGS, index = 2) {
+                SettingsScreen(
                     onOpenPrivacy = { showPrivacy = true },
                     onOpenSiteData = { showSiteData = true },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Keeps a tab's composition (and therefore its WebView / lists / scroll state)
+ * alive while it is not selected, and swallows touches when hidden so the
+ * invisible layer cannot receive taps meant for the visible one.
+ */
+@Composable
+private fun TabHost(
+    visible: Boolean,
+    index: Int,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .zIndex(if (visible) 1f else 0f)
+            .graphicsLayer { alpha = if (visible) 1f else 0f },
+    ) {
+        content()
+        if (!visible) {
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .pointerInput(index) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                awaitPointerEvent(PointerEventPass.Initial)
+                                    .changes
+                                    .forEach { it.consume() }
+                            }
+                        }
+                    },
+            )
         }
     }
 }

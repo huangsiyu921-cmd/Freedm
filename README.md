@@ -111,4 +111,4 @@ docs/     README.md（文档导读：按什么顺序读）
 
 ## 许可
 
-Apache-2.0
+GPL-3.0

@@ -144,12 +144,44 @@ fun BrowseScreen() {
     var showStart by remember { mutableStateOf(true) }
 
     var menuOpen by remember { mutableStateOf(false) }
-    // Tabs keep only the URL/title; the single WebView reloads on switch.
-    val tabs = remember { mutableStateListOf(TabEntry("", "")) }
-    var activeTab by remember { mutableIntStateOf(0) }
+    // Tabs keep only the URL/title; the single WebView reloads on switch. They are
+    // persisted so a restart comes back to the same set of pages.
+    val tabs = remember {
+        mutableStateListOf<TabEntry>().also { list ->
+            runCatching {
+                val arr = org.json.JSONArray(prefs.getString("browser_tabs", null) ?: "[]")
+                for (i in 0 until arr.length()) {
+                    val o = arr.getJSONObject(i)
+                    list.add(TabEntry(o.optString("url"), o.optString("title")))
+                }
+            }
+            if (list.isEmpty()) list.add(TabEntry("", ""))
+        }
+    }
+    var activeTab by remember {
+        mutableIntStateOf(prefs.getInt("browser_active_tab", 0).coerceIn(0, tabs.lastIndex))
+    }
     var showTabs by remember { mutableStateOf(false) }
     var findOpen by remember { mutableStateOf(false) }
     var findQuery by remember { mutableStateOf("") }
+
+    fun persistTabs() {
+        runCatching {
+            val arr = org.json.JSONArray()
+            tabs.forEach { t ->
+                arr.put(
+                    org.json.JSONObject().apply {
+                        put("url", t.url)
+                        put("title", t.title)
+                    },
+                )
+            }
+            prefs.edit()
+                .putString("browser_tabs", arr.toString())
+                .putInt("browser_active_tab", activeTab)
+                .apply()
+        }
+    }
     var sourceText by remember { mutableStateOf<String?>(null) }
     var historyOpen by remember { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
@@ -293,14 +325,29 @@ fun BrowseScreen() {
                     )
                 }
             }
-            if (canGoBack) {
-                IconButton(onClick = { webView?.goBack() }, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        Icons.Default.ArrowBack,
-                        contentDescription = "后退",
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+            // Back / forward stay visible and just grey out; hiding them made the
+            // bar shift around and gave no hint that history existed.
+            IconButton(
+                onClick = { webView?.goBack() },
+                enabled = canGoBack,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    Icons.Default.ArrowBack,
+                    contentDescription = "后退",
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            IconButton(
+                onClick = { webView?.goForward() },
+                enabled = canGoForward,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(
+                    Icons.Default.ArrowForward,
+                    contentDescription = "前进",
+                    modifier = Modifier.size(20.dp),
+                )
             }
             // Compact address bar: the field owns the reload action, so the bar
             // stays one line on a phone instead of crowding six icons.
@@ -533,8 +580,14 @@ fun BrowseScreen() {
                         }
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
 
-                        // Restore the last page when the user asked for it.
-                        if (prefs.getBoolean("remember_page", false)) {
+                        // Restore the active tab first; the older "remember page"
+                        // switch stays as a fallback when no tab URL was saved.
+                        val restored = tabs.getOrNull(activeTab)?.url.orEmpty()
+                        if (restored.isNotBlank()) {
+                            showStart = false
+                            address = restored
+                            loadUrl(restored)
+                        } else if (prefs.getBoolean("remember_page", false)) {
                             prefs.getString("last_page", null)?.takeIf { it.isNotBlank() }?.let {
                                 showStart = false
                                 loadUrl(it)
@@ -582,6 +635,7 @@ fun BrowseScreen() {
                                             url = url,
                                             title = v?.title?.takeIf { it.isNotBlank() } ?: url,
                                         )
+                                        persistTabs()
                                     }
                                     if (prefs.getBoolean("remember_page", false)) {
                                         prefs.edit().putString("last_page", url).apply()
@@ -731,6 +785,7 @@ fun BrowseScreen() {
                     TextButton(onClick = {
                         tabs.add(TabEntry("", ""))
                         activeTab = tabs.lastIndex
+                        persistTabs()
                         showTabs = false
                         showStart = true
                         address = ""
@@ -745,6 +800,7 @@ fun BrowseScreen() {
                             .clickable {
                                 showTabs = false
                                 activeTab = i
+                                persistTabs()
                                 if (tab.url.isBlank()) {
                                     showStart = true
                                     address = ""
@@ -786,6 +842,7 @@ fun BrowseScreen() {
                                 if (activeTab > i || activeTab >= tabs.size) {
                                     activeTab = (activeTab - 1).coerceAtLeast(0)
                                 }
+                                persistTabs()
                             }) {
                                 Icon(Icons.Default.Close, contentDescription = "关闭标签")
                             }

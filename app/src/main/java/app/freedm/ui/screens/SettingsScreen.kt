@@ -370,7 +370,7 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
                     Text("FreeDM 0.1.0", style = MaterialTheme.typography.bodyLarge)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "开源下载管理器，Apache-2.0",
+                        "开源下载管理器，GPL-3.0",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
