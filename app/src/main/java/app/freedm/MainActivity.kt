@@ -246,8 +246,12 @@ private fun AppRoot(scope: CoroutineScope) {
 
 /**
  * Keeps a tab's composition (and therefore its WebView / lists / scroll state)
- * alive while it is not selected, and swallows touches when hidden so the
- * invisible layer cannot receive taps meant for the visible one.
+ * alive while it is not selected.
+ *
+ * Hidden tabs are pushed far off-screen rather than just made transparent: an
+ * alpha-0 layer still takes part in hit testing, and its event-swallowing child
+ * was eating the drag gestures meant for the visible page (WebView could not
+ * scroll).
  */
 @Composable
 private fun TabHost(
@@ -259,24 +263,12 @@ private fun TabHost(
         Modifier
             .fillMaxSize()
             .zIndex(if (visible) 1f else 0f)
-            .graphicsLayer { alpha = if (visible) 1f else 0f },
+            .graphicsLayer {
+                alpha = if (visible) 1f else 0f
+                if (!visible) translationY = -20_000f
+            },
     ) {
         content()
-        if (!visible) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .pointerInput(index) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                awaitPointerEvent(PointerEventPass.Initial)
-                                    .changes
-                                    .forEach { it.consume() }
-                            }
-                        }
-                    },
-            )
-        }
     }
 }
 
