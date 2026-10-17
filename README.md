@@ -15,7 +15,7 @@
 | 分析 SDK | Firebase 栈（FCM） | 无 |
 | 本机标识 | ANDROID_ID + 品牌 + 型号指纹 | 随机 UUID，仅本地 |
 | UI | 抽屉 + 底部混合、主题市场 | 纯 M3 底部导航 |
-| 体积 | 45.6 MB | 9.7 MB |
+| 体积 | 45.6 MB | 1.3 MB（release，R8 后） |
 
 ## 功能
 
@@ -27,8 +27,12 @@
 - **列表**：单页四筛选（全部 / 进行中 / 已完成 / 错误），分段进度条铺满整行背景
 - **已完成**：点行直接打开文件；右键菜单看详细信息、重新下载、删除
 - **浏览器**：WebView + 媒体嗅探（DOM 扫描 + 网络层拦截），识别 HLS/DASH 清单；
-  **广告过滤**：内置域名名单（请求不联网更新），可在浏览页按站点关闭；
-  起始页带搜索框与常用站点，返回键逐层回退（历史 → 起始页 → 下载页 → 退出）
+  **多标签**，每个标签有自己的历史栈，后退/前进不串标签；
+  **浏览历史**独立成页（单条删除 / 清空），点一条回到浏览页打开；
+  **广告过滤**：内置域名名单（请求不联网更新），可在浏览页按站点关闭
+- **起始页**：快捷方式卡片堆，上滑展开成单列信息流，按信息流方向滚动；
+  回到卡片堆有两条手势 —— 划到最上面再往下拉、按住底部横杠往上推；
+  卡片颜色可从预设里挑，也可以选「自动」跟随站点图标
 - **分享接收**：`ACTION_SEND` / `ACTION_VIEW` 直接建任务
 - **剪贴板识别**：默认关闭，仅前台生效，不保存原文
 - **导出**：可选复制到系统 Downloads（MediaStore）
@@ -55,11 +59,14 @@
 app/src/main/java/app/freedm/
   MainActivity.kt          单 Activity，三个底部 tab + 逐层返回
   data/  Model.kt Db.kt Repo.kt     数据模型 / SQLiteOpenHelper / 仓储
+         SiteStore.kt              起始页快捷方式（JSON 存 prefs）
+         HistoryStore.kt           浏览历史（跨标签、跨会话）
   engine/ Prober.kt Engine.kt       探测与文件名推导 / 分段下载调度
           RateLimiter.kt Exporter.kt 全局限速 / 导出到公共目录
   service/ DownloadService.kt Notifier.kt   前台服务 / 终态通知
   browser/ Sniffer.kt ClipboardWatcher.kt   媒体嗅探 / 剪贴板识别
   ui/ screens/ components/ theme/    Compose 界面；components/ 是分段进度条
+      BrowserBus.kt                 历史页 → 浏览页的单发通道
 tools/    range_server.py（Range 测试源）· parse_dump.py（UI 自动化取坐标）
           check_doc_coverage.py（机械核对代码常量是否都写进了文档）
 docs/     README.md（文档导读：按什么顺序读）
@@ -76,7 +83,7 @@ docs/     README.md（文档导读：按什么顺序读）
 
 | 项 | 结果 |
 |---|---|
-| 构建 | `assembleDebug` 通过，APK 9.7 MB |
+| 构建 | `assembleDebug` 通过，APK 9.5 MB（debug）/ 1.3 MB（release） |
 | 冷启动 | Android 11 x86_64 模拟器，无崩溃 |
 | 单段小文件 | `README.md` 3808 B，内容完整 |
 | **多线程分片** | 服务器收到 **6 个并发 Range**，首尾相接无重叠无空洞 |
@@ -90,6 +97,8 @@ docs/     README.md（文档导读：按什么顺序读）
 | 分享接收 | `ACTION_SEND` → 弹出「新建下载」且 URL 已预填 |
 | 真机冷启动 | Android 16 / arm64（荣耀 MAA-AN00），无崩溃 |
 | 真机分段下载 | 48.9 MB / 8 段，落盘大小与远端 `Content-Length` 一致 |
+| 起始页手势 | 上滑展开成信息流、划到顶下拉 / 横杠上推回到卡片堆，松手无跳变 |
+| 标签历史 | 各标签后退互不影响；从网页返回起始页后标签同步清空，重进不回到旧网址 |
 | 分段进度条 | 行背景逐段着色，完成后整行纯色（与下载中同色） |
 | 已完成行点击 | 直接调系统「打开方式」，不再先进详情页 |
 | 返回逐层 | 网页历史 → 起始页 → 下载页 → 退出 |
@@ -101,8 +110,10 @@ docs/     README.md（文档导读：按什么顺序读）
 
 ## 已知限制
 
+- **Bing 首页**在 WebView 里可能只渲染出一张背景图，内容不出来，尚未定位
 - **HLS(`.m3u8`) 只作单文件下载**，无分片合并（UI 已提示）
 - **UI 缺口**：任务列表长按多选、添加下载时更改保存位置 —— 未实现
+- 起始页手势与动画仍在打磨，回收的手感会继续调
 - 广告过滤只按域名拦截，不处理页面内的内联广告位；规则随安装包更新，不联网订阅
 - 浏览器无密码管理、无主题市场
 - 未做 torrent
