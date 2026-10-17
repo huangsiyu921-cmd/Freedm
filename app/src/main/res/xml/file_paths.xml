@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths>
-    <files-path name="downloads_legacy" path="downloads/" />
-    <external-files-path name="downloads" path="FreeDM/" />
+    <!-- 旧版本落在应用私有目录的任务仍要能打开 -->
+    <files-path name="legacy_private" path="downloads/" />
+    <external-files-path name="legacy_external" path="FreeDM/" />
+    <!-- 有"所有文件访问"后下载根目录在公共 Downloads 下 -->
+    <external-path name="public_downloads" path="Download/FreeDM/" />
 </paths>

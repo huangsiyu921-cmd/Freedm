@@ -118,6 +118,21 @@ private fun looksLikeDownload(url: String): Boolean {
 /** One browser tab: only the address and title are kept. */
 private data class TabEntry(val url: String, val title: String)
 
+/**
+ * Desktop mode needs more than a desktop UA: sites with responsive CSS still lay
+ * out to the phone viewport, so GitHub looked mobile. Widen the layout viewport
+ * and keep a minimum page width.
+ */
+private const val DESKTOP_VIEWPORT_JS = """
+(function() {
+  var w = '1280';
+  var m = document.querySelector('meta[name="viewport"]');
+  if (!m) { m = document.createElement('meta'); m.setAttribute('name', 'viewport'); document.head.appendChild(m); }
+  m.setAttribute('content', 'width=' + w);
+  document.documentElement.style.minWidth = w + 'px';
+})();
+"""
+
 private const val UA_DESKTOP =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -223,7 +238,9 @@ fun BrowseScreen() {
         prefs.edit().putBoolean("desktop_ua", on).apply()
         webView?.let {
             it.settings.userAgentString = if (on) UA_DESKTOP else Prober.UA
-            it.reload()
+            // Re-request instead of reload: the UA decides what the server renders.
+            val url = it.url
+            if (url != null) it.loadUrl(url) else it.reload()
         }
     }
 
@@ -651,7 +668,9 @@ fun BrowseScreen() {
                                             }
                                         }
                                 }
-                                if (!snifferEnabled || v == null) return
+                                if (v == null) return
+                                if (desktopUa) v.evaluateJavascript(DESKTOP_VIEWPORT_JS, null)
+                                if (!snifferEnabled) return
                                 v.evaluateJavascript(Sniffer.PROBE_JS) { raw ->
                                     absorb(Sniffer.parseProbeResult(raw))
                                 }

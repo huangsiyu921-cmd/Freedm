@@ -1309,3 +1309,108 @@ addSelected():
 | 面板打开时页面跳转 | `media.clear()` + `selected.clear()`，避免选中项指向旧页面 |
 | 大批量（>20） | 串行创建在 IO 线程，界面不阻塞；`pump()` 保证只有 N 个真正开跑 |
 
+---
+
+# 第 18 部分 · 文件类型识别与目录归档
+
+> 两个能力：**认出这是什么文件**（决定图标），以及**该放进哪个目录**（可选归档）。
+> 逆向来源与原产品的完整扩展名表见 `...\1DM+\specs\file-types-and-folders.md`。
+
+## 18.1 类型枚举
+
+```
+FileKind(folder: String) {
+    SUBTITLE("Subtitles")     COMPRESSED("Compressed")
+    DOCUMENT("Documents")     MUSIC("Music")
+    VIDEO("Video")            PHOTO("Pictures")
+    PROGRAM("Programs")       TORRENT("Torrents")
+    OTHER("Other")
+}
+```
+
+`folder` 是归档时的子目录名（英文，避免跨语言不一致）。
+
+## 18.2 判定顺序 `FileKinds.of(fileName, mime)`
+
+```
+ext ← 文件名最后一个 '.' 之后，转小写
+      （没有 '.' / 点在最前 / 点在最后 → ext 为 null）
+
+若 ext 存在，按固定顺序查表，命中即返回：
+    1. 字幕集   → SUBTITLE
+    2. 压缩集   → COMPRESSED
+    3. 文档集   → DOCUMENT
+    4. 音频集   → MUSIC
+    5. 视频集   → VIDEO
+    6. 图片集   → PHOTO
+    7. 程序集   → PROGRAM
+    8. 种子集   → TORRENT
+    9. 镜像集（iso/img/dmg/vhd/vhdx）→ OTHER
+       其它 → 继续走 MIME 回落
+
+MIME 回落（ext 认不出或缺失时）：
+    application/vnd.apple.mpegurl 或 application/dash+xml → VIDEO   ← 流媒体清单算视频
+    audio/*   → MUSIC
+    video/*   → VIDEO
+    image/*   → PHOTO
+    text/*    → DOCUMENT
+    application/pdf → DOCUMENT
+    application/zip | x-tar | gzip | x-7z-compressed → COMPRESSED
+    application/vnd.android.package-archive → PROGRAM
+    application/x-bittorrent → TORRENT
+    其余 → OTHER
+```
+
+**顺序不能改的三个理由**
+
+| 规则 | 原因 |
+|---|---|
+| 字幕排第 1 | `.ass` / `.sub` 与其它族不冲突，但必须早于"程序"（`.sh` 不冲突）与"文档" |
+| 音频在视频**之前** | `.m4a`/`.mp4` 同源，靠集合内容区分；顺序反了会把部分音频判成视频 |
+| 镜像单独判 OTHER | `iso`/`img`/`bin` 里 `bin` 与程序集重叠，必须在程序之前处理才不会被判成可执行 |
+
+## 18.3 图标映射
+
+```
+VIDEO → ic_kind_video      MUSIC → ic_kind_music
+PHOTO → ic_kind_photo      DOCUMENT → ic_kind_document
+COMPRESSED → ic_kind_compressed   PROGRAM → ic_kind_program
+TORRENT → ic_kind_torrent  SUBTITLE → ic_kind_subtitle
+OTHER → ic_file（通用）
+```
+
+全部是单色 vector，由 `Icon(tint = …)` 着色，跟随行的前景色——不额外准备深/浅两套。
+
+## 18.4 自动归档的接线点
+
+**只改一处**：`Repo.create()`。
+
+```
+Repo.create(url, fileName, dirPath, threads, wifiOnly, probe):
+    if (prefs["auto_categorize"] == true):
+        kind ← FileKinds.of(fileName, probe?.mime)
+        targetDir ← dirPath / kind.folder      // 并 mkdirs()
+    else:
+        targetDir ← dirPath
+    用 targetDir 入库
+```
+
+为什么放在 `Repo.create` 而不是引擎里：
+
+- 引擎拿到的已经是最终路径，不用关心归档策略；
+- 所有创建任务的入口（手动添加 / 嗅探批量 / 保存网页 / 重新下载）自动统一；
+- 归档只影响**新任务**，已存在任务的 `dirPath` 不被改写。
+
+## 18.5 边界
+
+| 情况 | 行为 |
+|---|---|
+| 文件名无扩展名 | 走 MIME 回落；MIME 也没有 → `OTHER` |
+| 文件名以 `.` 开头（隐藏文件） | 视为无扩展名 |
+| 扩展名未知但 MIME 是 `audio/*` | `MUSIC` |
+| `bin` 扩展名 | 镜像集优先 → `OTHER`（不会被判成 `PROGRAM`） |
+| 归档开启但子目录不存在 | `mkdirs()` 后写入 |
+| 归档关闭（默认） | 全部平铺在下载根目录，与上游产品一致 |
+| 归档后用户改设置 | 只影响新任务；旧任务路径不变 |
+| 分类结果是否需要落库 | **不需要**。纯函数，从文件名现算即可；落库反而要处理改名失效 |
+

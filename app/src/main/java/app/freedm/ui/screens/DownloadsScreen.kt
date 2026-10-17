@@ -68,6 +68,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
 import app.freedm.R
 import app.freedm.data.DownloadTask
+import app.freedm.data.FileKind
+import app.freedm.data.FileKinds
 import app.freedm.data.Repo
 import app.freedm.data.Segment
 import app.freedm.data.TaskState
@@ -231,9 +233,10 @@ private fun redownload(t: DownloadTask) {
 }
 
 private fun openFile(ctx: Context, t: DownloadTask) {
-    val f = File(t.filePath)
-    if (!f.exists()) {
-        Toast.makeText(ctx, "文件不存在", Toast.LENGTH_SHORT).show()
+    val f = resolveFile(t)
+    if (f == null) {
+        // The file may have been exported to public Downloads, then edited/moved.
+        Toast.makeText(ctx, "找不到文件（可能已移动或删除）", Toast.LENGTH_SHORT).show()
         return
     }
     val ok = runCatching {
@@ -245,6 +248,20 @@ private fun openFile(ctx: Context, t: DownloadTask) {
         )
     }.isSuccess
     if (!ok) Toast.makeText(ctx, "没有能打开它的应用", Toast.LENGTH_SHORT).show()
+}
+
+/**
+ * Locates a finished download. The recorded path is tried first; if the private
+ * copy was removed after exporting, the public Downloads copy is used instead.
+ */
+private fun resolveFile(t: DownloadTask): File? {
+    val direct = File(t.filePath)
+    if (direct.exists()) return direct
+    @Suppress("DEPRECATION")
+    val publicDir = android.os.Environment
+        .getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS)
+    val exported = File(publicDir, t.fileName)
+    return if (exported.exists()) exported else null
 }
 
 /**
@@ -339,7 +356,7 @@ private fun TaskCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
-                painter = painterResource(R.drawable.ic_file),
+                painter = painterResource(kindIcon(task.fileName)),
                 contentDescription = null,
                 tint = onTop.copy(alpha = 0.9f),
                 modifier = Modifier
@@ -543,4 +560,17 @@ private fun AddDownloadSheet(
             Spacer(Modifier.height(10.dp))
         }
     }
+}
+
+/** List icon chosen by file kind (extension set + MIME fallback). */
+private fun kindIcon(fileName: String): Int = when (FileKinds.of(fileName)) {
+    FileKind.VIDEO -> R.drawable.ic_kind_video
+    FileKind.MUSIC -> R.drawable.ic_kind_music
+    FileKind.PHOTO -> R.drawable.ic_kind_photo
+    FileKind.DOCUMENT -> R.drawable.ic_kind_document
+    FileKind.COMPRESSED -> R.drawable.ic_kind_compressed
+    FileKind.PROGRAM -> R.drawable.ic_kind_program
+    FileKind.TORRENT -> R.drawable.ic_kind_torrent
+    FileKind.SUBTITLE -> R.drawable.ic_kind_subtitle
+    FileKind.OTHER -> R.drawable.ic_file
 }

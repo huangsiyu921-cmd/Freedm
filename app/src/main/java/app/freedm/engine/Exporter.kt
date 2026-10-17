@@ -21,6 +21,11 @@ object Exporter {
     fun exportIfEnabled(context: Context, file: File, displayName: String) {
         if (!Repo.prefs().getBoolean("export_public", true)) return
         if (!file.exists() || file.length() == 0L) return
+        // With all-files access the download root already IS the public Downloads
+        // folder, so copying (and deleting the source) would only break the task.
+        @Suppress("DEPRECATION")
+        val publicRoot = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (file.absolutePath.startsWith(publicRoot.absolutePath)) return
 
         runCatching {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

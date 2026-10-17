@@ -4,6 +4,11 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
+import android.app.AlertDialog
+import android.app.role.RoleManager
+import android.net.Uri
+import android.os.Environment
+import android.provider.Settings
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -77,6 +82,14 @@ class MainActivity : ComponentActivity() {
     private val notifPermission =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
 
+    private val browserRoleLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { }
+
+    private val allFilesLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Repo.init(this)
@@ -98,6 +111,9 @@ class MainActivity : ComponentActivity() {
         ) {
             notifPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
+
+        askDefaultBrowserOnce()
+        askAllFilesOnce()
 
         setContent {
             val tick by Repo.themeTick.collectAsState()
@@ -131,6 +147,44 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         consumeIntent(intent)
+    }
+
+    /** Asks once to become the default browser (Android 10+ role request). */
+    private fun askDefaultBrowserOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val rm = getSystemService(RoleManager::class.java) ?: return
+        if (!rm.isRoleAvailable(RoleManager.ROLE_BROWSER)) return
+        if (rm.isRoleHeld(RoleManager.ROLE_BROWSER)) return
+        val prefs = Repo.prefs()
+        if (prefs.getBoolean("asked_browser_role", false)) return
+        prefs.edit().putBoolean("asked_browser_role", true).apply()
+        runCatching { browserRoleLauncher.launch(rm.createRequestRoleIntent(RoleManager.ROLE_BROWSER)) }
+    }
+
+    /**
+     * Asks once for "all files access" so downloads can land in the public
+     * Download folder (and be openable from any file manager).
+     */
+    private fun askAllFilesOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        if (Environment.isExternalStorageManager()) return
+        val prefs = Repo.prefs()
+        if (prefs.getBoolean("asked_all_files", false)) return
+        prefs.edit().putBoolean("asked_all_files", true).apply()
+        AlertDialog.Builder(this)
+            .setMessage("让下载直接保存到 Download 目录")
+            .setPositiveButton("去开启") { _, _ ->
+                runCatching {
+                    allFilesLauncher.launch(
+                        Intent(
+                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                            Uri.parse("package:$packageName"),
+                        ),
+                    )
+                }
+            }
+            .setNegativeButton("稍后", null)
+            .show()
     }
 
     /** Picks up a shared link without storing anything about the sender. */

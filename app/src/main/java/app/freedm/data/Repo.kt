@@ -2,6 +2,8 @@ package app.freedm.data
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
+import android.os.Environment
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,15 +50,25 @@ object Repo {
     /**
      * Where finished and in-progress files live.
      *
-     * On app-specific *external* storage (`/sdcard/Android/data/<pkg>/files/FreeDM`),
-     * not under `/data/data/…`: segment writes need random access so MediaStore is
-     * out, but the file must still be reachable without root.
+     * With "all files access" (MANAGE_EXTERNAL_STORAGE) this is the public
+     * `Download/FreeDM`, so finished downloads are visible to every file manager
+     * and opening them actually finds the file. Without that grant we fall back to
+     * app-specific external storage, which needs no permission but hides files.
      */
     val downloadsDir: File
-        get() = File(
-            appContext.getExternalFilesDir(null) ?: appContext.filesDir,
-            "FreeDM",
-        ).apply { mkdirs() }
+        get() {
+            val base = if (hasAllFilesAccess()) {
+                @Suppress("DEPRECATION")
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+            } else {
+                appContext.getExternalFilesDir(null) ?: appContext.filesDir
+            }
+            return File(base, "FreeDM").apply { mkdirs() }
+        }
+
+    /** True when we may write anywhere on shared storage. */
+    fun hasAllFilesAccess(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.R || Environment.isExternalStorageManager()
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -107,12 +119,19 @@ object Repo {
         probe: ProbeResult?,
     ): Long {
         val now = System.currentTimeMillis()
+        // Optional auto-filing: drop each file into a per-type subfolder.
+        val targetDir = if (prefs().getBoolean("auto_categorize", true)) {
+            val kind = FileKinds.of(fileName, probe?.mime)
+            File(dirPath, kind.folder).apply { mkdirs() }.absolutePath
+        } else {
+            dirPath
+        }
         val t = DownloadTask(
             id = 0,
             url = url,
             finalUrl = probe?.finalUrl,
             fileName = fileName,
-            dirPath = dirPath,
+            dirPath = targetDir,
             totalBytes = probe?.totalBytes ?: -1,
             downloaded = 0,
             state = TaskState.QUEUED,

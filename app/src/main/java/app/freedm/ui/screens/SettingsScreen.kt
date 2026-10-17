@@ -60,6 +60,7 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
     var wifiOnly by remember { mutableStateOf(prefs.getBoolean("wifi_only", false)) }
     var autoResume by remember { mutableStateOf(prefs.getBoolean("auto_resume", true)) }
     var exportPublic by remember { mutableStateOf(prefs.getBoolean("export_public", true)) }
+    var autoCategorize by remember { mutableStateOf(prefs.getBoolean("auto_categorize", false)) }
     var sniff by remember { mutableStateOf(prefs.getBoolean("sniff", true)) }
     var desktopUa by remember { mutableStateOf(prefs.getBoolean("desktop_ua", false)) }
     var jsEnabled by remember { mutableStateOf(prefs.getBoolean("js_enabled", true)) }
@@ -233,6 +234,17 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
                     onChange = {
                         exportPublic = it
                         prefs.edit().putBoolean("export_public", it).apply()
+                    },
+                )
+            }
+            item {
+                SwitchRow(
+                    label = "按类型归档",
+                    description = "新任务按文件类型放进 Video / Music / Documents 等子目录",
+                    checked = autoCategorize,
+                    onChange = {
+                        autoCategorize = it
+                        prefs.edit().putBoolean("auto_categorize", it).apply()
                     },
                 )
             }
