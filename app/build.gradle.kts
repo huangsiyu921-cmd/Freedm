@@ -17,6 +17,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Test builds live under a separate id so they can sit next to a
+            // signed release install without overwriting it.
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
