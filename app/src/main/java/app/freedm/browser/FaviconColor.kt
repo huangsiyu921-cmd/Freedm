@@ -75,8 +75,8 @@ object FaviconColor {
         val n = best[3]
         Color.RGBToHSV(best[0] / n, best[1] / n, best[2] / n, hsv)
         // Lift saturation/value so the colour survives as a dark-theme card.
-        hsv[1] = hsv[1].coerceAtLeast(0.45f)
-        hsv[2] = hsv[2].coerceIn(0.55f, 0.85f)
+        hsv[1] = hsv[1].coerceIn(0.5f, 1f)
+        hsv[2] = hsv[2].coerceIn(0.5f, 0.92f)
         return Color.HSVToColor(hsv)
     }
 
@@ -90,32 +90,54 @@ object FaviconColor {
     }
 
     /**
-     * Material tonal treatment of a brand colour: keep the hue, fix chroma and
-     * tone. That is what makes cards from wildly different logos sit together.
+     * Keep the site's own colour. Only clamp the extremes so a near-black logo
+     * still works on a dark theme and a near-white one on a light theme — the
+     * previous version pinned chroma/tone, which flattened 知乎蓝 and 豆瓣绿 into
+     * the same slate blue.
      */
     fun containerColor(argb: Int, dark: Boolean): Int {
         val hsv = FloatArray(3)
         Color.colorToHSV(argb, hsv)
-        // Keep the logo's hue and most of its chroma; only pin the tone so a
-        // white logo and a black logo both end up usable. Tuned bright enough
-        // that a card still reads as "that site's colour".
-        hsv[1] = if (dark) 0.55f else 0.42f
-        hsv[2] = if (dark) 0.62f else 0.90f
+        if (dark) {
+            hsv[1] = hsv[1].coerceIn(0.45f, 0.95f)
+            hsv[2] = hsv[2].coerceIn(0.42f, 0.68f)
+        } else {
+            hsv[1] = hsv[1].coerceIn(0.35f, 0.85f)
+            hsv[2] = hsv[2].coerceIn(0.72f, 0.95f)
+        }
         return Color.HSVToColor(hsv)
     }
 
-    /** On-colour paired with [containerColor]. */
-    fun onContainerColor(argb: Int, dark: Boolean): Int {
-        val hsv = FloatArray(3)
-        Color.colorToHSV(argb, hsv)
-        hsv[1] = if (dark) 0.12f else 0.62f
-        hsv[2] = if (dark) 0.97f else 0.16f
-        return Color.HSVToColor(hsv)
-    }
+    /** Text colour that actually contrasts with [containerColor]. */
+    fun onContainerColor(argb: Int, dark: Boolean): Int = onColor(containerColor(argb, dark))
 
-    /** Fallback tint for sites whose icon cannot be read. */
+    /**
+     * Fallback tint for sites whose icon cannot be read. Deliberately neutral:
+     * a hashed hue made 知乎 and GitHub cards come out green/teal, which reads as
+     * "wrong brand colour" instead of "no data".
+     */
     fun fromString(seed: String): Int {
-        val hsv = floatArrayOf((seed.hashCode() and 0x7FFFFFFF) % 360f, 0.55f, 0.72f)
+        val hsv = floatArrayOf((seed.hashCode() and 0x7FFFFFFF) % 40f + 200f, 0.22f, 0.55f)
         return Color.HSVToColor(hsv)
+    }
+
+    /**
+     * Brand colours for sites whose icon is monochrome, so no colour can be
+     * sampled from it — better than showing a hashed hue.
+     */
+    fun brand(host: String): Int? = when {
+        host.endsWith("github.com") -> 0xFF24292F.toInt()
+        host.contains("zhihu.com") -> 0xFF0084FF.toInt()
+        host.contains("bilibili.com") -> 0xFFFB7299.toInt()
+        host.contains("douban.com") -> 0xFF2E963D.toInt()
+        host.contains("baidu.com") -> 0xFF2932E1.toInt()
+        host.contains("bing.com") -> 0xFF008373.toInt()
+        host.contains("google.com") -> 0xFF4285F4.toInt()
+        host.contains("youtube.com") -> 0xFFFF0000.toInt()
+        host.contains("weibo.com") -> 0xFFE6162D.toInt()
+        host.contains("taobao.com") || host.contains("tmall.com") -> 0xFFFF5000.toInt()
+        host.contains("jd.com") -> 0xFFE1251B.toInt()
+        host.contains("qq.com") -> 0xFF12B7F5.toInt()
+        else -> null
     }
 }

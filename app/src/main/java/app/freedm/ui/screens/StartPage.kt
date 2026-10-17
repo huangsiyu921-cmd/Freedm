@@ -98,7 +98,22 @@ fun StartPage(
     val ctx = LocalContext.current
     val prefs = remember { Repo.prefs() }
     val scope = rememberCoroutineScope()
-    val sites = remember { mutableStateListOf<QuickSite>().also { it.addAll(SiteStore.load(prefs)) } }
+    val sites = remember {
+        val loaded = SiteStore.load(prefs).toMutableList()
+        // One-time migration: earlier builds painted monochrome-logo sites with a
+        // hashed hue, so GitHub came out teal/green. Re-seed from brand colours.
+        if (!prefs.getBoolean("site_color_v2", false)) {
+            for (i in loaded.indices) {
+                val host = runCatching { android.net.Uri.parse(loaded[i].url).host }
+                    .getOrNull().orEmpty()
+                val colour = FaviconColor.brand(host) ?: FaviconColor.fromString(host)
+                loaded[i] = loaded[i].copy(color = colour)
+            }
+            SiteStore.save(prefs, loaded)
+            prefs.edit().putBoolean("site_color_v2", true).apply()
+        }
+        mutableStateListOf<QuickSite>().also { it.addAll(loaded) }
+    }
 
     var text by remember { mutableStateOf("") }
     var index by remember { mutableIntStateOf(0) }
@@ -116,7 +131,11 @@ fun StartPage(
 
     fun upsert(old: QuickSite?, label: String, url: String) {
         val host = runCatching { Uri.parse(url).host }.getOrNull() ?: url
-        val provisional = QuickSite(label, url, FaviconColor.fromString(host))
+        val provisional = QuickSite(
+            label,
+            url,
+            FaviconColor.brand(host) ?: FaviconColor.fromString(host),
+        )
         val at = old?.let { o -> sites.indexOfFirst { it.url == o.url } } ?: -1
         if (at >= 0) sites[at] = provisional else sites.add(provisional)
         if (index >= sites.size + 1) index = 0
@@ -125,6 +144,7 @@ fun StartPage(
         scope.launch {
             val colour = withContext(Dispatchers.IO) {
                 runCatching { FaviconColor.fetch(host, Prober.UA) }.getOrNull()
+                    ?: FaviconColor.brand(host)
             }
             if (colour != null) {
                 val i = sites.indexOfFirst { it.url == url }
