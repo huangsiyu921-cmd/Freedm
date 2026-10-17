@@ -918,15 +918,19 @@ Repo.delete(id, deleteFiles = true)     // 记录 + 文件一起删
 进入页面时: Repo.publishSegments(id)     // 拉一次分片详情
 ```
 
-## 11.6 已完成页
+## 11.6 已完成任务（已并入下载页）
 
 ```
+点行:     ACTION_VIEW(FileProvider.getUriForFile(ctx, "$pkg.fileprovider", 文件), mime ?: "*/*")
+          + FLAG_GRANT_READ_URI_PERMISSION —— 打不开时 Toast「没有能打开它的应用」
+菜单 ⋮:   详细信息 → TaskDetailScreen ; 重新下载 ; 删除
 重新下载: Repo.create(同 url, uniqueIn(原目录, 原名), 同 dirPath, 同 threadCount, 同 wifiOnly, probe=null)
-          ; Engine.pump()
+          ; DownloadService.start(ctx) ; Engine.pump()
           —— 注意 probe 传 null，重新探测
-重试:     Repo.setState(id, QUEUED) ; Engine.pump()
 删除:     Repo.delete(id, true)
 ```
+
+未完成的任务点行仍是进详情页（文件不完整，打开无意义）。
 
 ## 11.7 嗅探结果「下载」
 
@@ -942,10 +946,15 @@ DownloadService.start(ctx) ; Engine.start(id)
 ```
 地址栏回车: 若以 http(s):// 开头 → 直接加载
             否则若含 '.' 且不含空格 → 加载 "https://" + 输入
-            否则 → 搜索引擎前缀 + URLEncode(输入)      // 默认 DuckDuckGo
+            否则 → 搜索引擎前缀 + URLEncode(输入)      // 默认 Bing（cn.bing.com）
+起始页:   showStart = true 时用 Compose 覆盖层，不加载 about:blank
+          （搜索框 + 六个常用站点；提交后 showStart = false）
 后退/前进: WebView.goBack() / goForward()，enabled 由 canGoBack/canGoForward 控制
+          前进按钮仅在有前进历史时出现
 刷新:     WebView.reload()
-主页:     WebView.loadUrl("about:blank") ; 清空地址栏与嗅探结果
+主页:     WebView.loadUrl("about:blank") ; 清空地址栏与嗅探结果 ; showStart = true
+返回键:   canGoBack → goBack()；否则 showStart = false → 回起始页；
+          再按 → tab 回下载页；再按 → 退出（均由 BackHandler 注册，后注册者优先）
 ```
 
 ## 11.9 应用启动（MainActivity.onCreate）
@@ -1106,4 +1115,106 @@ m ← 正则 https?://[^\s"'<>]+ 的第一个匹配
 （`<1024` 显示 B、`≥100` 不带小数、否则一位小数），两处独立维护。
 
 **重建时应合并为一个**，否则改了其中一处，会出现"通知里的速度"和"列表里的速度"格式不一致。
+
+---
+
+# 第 16 部分 · 分段进度条（作为列表行背景）
+
+> 目标视觉：进度**铺满整个行**，而不是一条细进度条。
+> 已完成行呈现整片纯色；下载中行呈现多条竖向色带，带之间有一条细缝。
+
+## 16.1 几何算法（可直接照着写）
+
+```
+W = 行宽    H = 行高    n = 分片数
+overall = 总进度 (0..1)          percents[i] = 第 i 段进度 (0..1)
+
+if n <= 1:
+    drawRect(x=0, y=0, w = W * overall, h = H)
+
+else:
+    segW = W / n
+    for i in 0 until n:
+        x = i * segW
+        p = percents[i]（缺失按 0）
+        seamless = (i == 0) or (percents[i-1] >= 1.0)
+        if seamless:
+            drawRect(x = x,             w = p * segW, h = H)
+        else:
+            drawRect(x = x + 1,         w = p * segW, h = H)     // 起点留 1px 缝
+```
+
+**两个必须照做的细节**
+
+1. `seamless` 的判定是「**前一段**是否已满」，不是「自己」。
+   所以第一段永远无缝（左边缘贴边），而一段满、下一段未满时，下一段从自己的
+   `x + 1` 开始——视觉上像"满段后面紧跟一条缝"。
+2. 有缝分支里，宽度**不减去那 1 px**（仍是 `p * segW`）。
+   所以 `p == 1` 时右边界会比段边界多出 1 px。这是刻意保留的：若减去，
+   满段与未满段之间会出现 2 px 的宽缝，看起来像断开了。
+
+## 16.2 为什么会"无缝"和"有缝"两种分支
+
+- **全部完成**：所有 `percents[i] == 1`，除第一段外每段都满足 `percents[i-1] >= 1`，
+  于是全部走无缝分支，矩形首尾相接 → **整行一片纯色**。
+- **下载中**：各段进度参差，未满段只填前面一截，段起点又留缝 → **断续色带**。
+- **单段**：退化为普通水平条。
+
+## 16.3 数据来源
+
+```
+分片模式（n > 1）：Engine.progress[taskId].segmentPercents
+                    —— 每 500 ms 由 ticker 从各段的 AtomicLong 算出
+                    长度 = 该任务的段数；段长未知（endByte 为哨兵）时该段记 0
+
+单段模式（n = 1）：overall = downloaded / total
+
+已完成：n = 1, overall = 1          （整行填满即可，不必逐段算）
+```
+
+`segmentPercents` 的计算：
+
+```
+for each seg in plan:
+    len = (seg.endByte == MAX_VALUE) ? -1 : seg.length
+    pct = (len > 0) ? clamp(written[seg] / len, 0, 1) : 0
+```
+
+## 16.4 行内布局（与进度同一层）
+
+进度是**行容器的背景层**，内容叠在它上面（不是放在内容下面的一根条）：
+
+```
+Box(clip 12dp 圆角, minHeight 64dp)
+ ├── 进度层：Canvas 铺满 + 底色 track
+ └── Row(padding h8/v10, 垂直居中)
+      ├── 文件图标  32dp（内含 6dp 内边距）
+      ├── Column(weight 1, start 8dp)
+      │    ├── 文件名        14sp, 单行, 尾部省略
+      │    └── Row(上边距 3dp)
+      │         ├── "62% | 1.2 GB"        11sp, 左对齐, 最大宽 150dp
+      │         ├── 速度 "8.4 MB/s"        11sp, 右对齐, weight 1
+      │         └── 剩余 "1 分 20 秒"      11sp, 右对齐, 最小宽 50dp
+      └── 动作按钮 40dp（下载中=暂停，其余=继续）
+```
+
+文字颜色跟随进度色对比：已完成行用 `onPrimary`，其余用 `onSurface`。
+未下载部分的底色用 `surfaceVariant`。
+
+## 16.5 边界
+
+| 情况 | 处理 |
+|---|---|
+| `n <= 0` | 按 1 处理，避免除零 |
+| `percents` 比 `n` 短 | 缺的段按 0，不抛异常 |
+| `p < 0` 或 `p > 1` | 截断到 `[0,1]` |
+| `p == 0` | 跳过该段（不画零宽矩形） |
+| `W` 或 `H` == 0（尚未测量） | 直接返回，不画 |
+| 段长未知（`endByte` 为哨兵） | 该段进度记 0，整任务退化为单段显示 |
+| 已完成任务 | 直接 `n = 1, overall = 1`，不必逐段算 |
+
+## 16.6 可配置项（原产品做法，重建可选）
+
+原产品有个"显示分片进度"总开关：关掉后强制 `n = 1`，退化为普通进度条。
+重建时若实现该开关，语义应为**纯显示层**——不影响下载本身的分片行为。
 

@@ -7,6 +7,8 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -75,6 +78,9 @@ fun BrowseScreen() {
     val media = remember { mutableStateListOf<SniffedMedia>() }
     var showMedia by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    // The start page is a Compose overlay rather than a loaded URL, so the first
+    // thing on screen is never a blank WebView.
+    var showStart by remember { mutableStateOf(true) }
 
     val snifferEnabled = remember { Repo.prefs().getBoolean("sniff", true) }
 
@@ -91,27 +97,44 @@ fun BrowseScreen() {
         } else if (text.contains('.') && !text.contains(' ')) {
             "https://$text"
         } else {
-            val engine = Repo.prefs().getString("search_engine", "https://duckduckgo.com/?q=")!!
+            val engine = Repo.prefs().getString("search_engine", SEARCH_DEFAULT)!!
             engine + java.net.URLEncoder.encode(text, "UTF-8")
         }
+        showStart = false
         webView?.loadUrl(target)
     }
+
+    fun showStartPage() {
+        webView?.loadUrl("about:blank")
+        address = ""
+        media.clear()
+        showStart = true
+    }
+
+    // Back walks the WebView history first, then returns to the start page.
+    // Only after that does the system leave the tab.
+    BackHandler(enabled = canGoBack) { webView?.goBack() }
+    BackHandler(enabled = !canGoBack && !showStart) { showStartPage() }
 
     Column(Modifier.fillMaxSize()) {
         Row(
             Modifier
                 .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
                 .padding(horizontal = 6.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             IconButton(onClick = { webView?.goBack() }, enabled = canGoBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "后退")
             }
-            IconButton(onClick = { webView?.goForward() }, enabled = canGoForward) {
-                Icon(Icons.Default.ArrowForward, contentDescription = "前进")
+            // Only shown when there is forward history, to keep the bar readable.
+            if (canGoForward) {
+                IconButton(onClick = { webView?.goForward() }) {
+                    Icon(Icons.Default.ArrowForward, contentDescription = "前进")
+                }
             }
             OutlinedTextField(
-                value = address,
+                value = if (showStart) "" else address,
                 onValueChange = { address = it },
                 placeholder = { Text("搜索或输入网址") },
                 singleLine = true,
@@ -125,11 +148,7 @@ fun BrowseScreen() {
             IconButton(onClick = { webView?.reload() }) {
                 Icon(Icons.Default.Refresh, contentDescription = "刷新")
             }
-            IconButton(onClick = {
-                webView?.loadUrl("about:blank")
-                address = ""
-                media.clear()
-            }) {
+            IconButton(onClick = { showStartPage() }) {
                 Icon(Icons.Default.Home, contentDescription = "主页")
             }
             TextButton(onClick = { showMedia = true }) {
@@ -141,71 +160,90 @@ fun BrowseScreen() {
             LinearProgressIndicator(progress = { loading }, modifier = Modifier.fillMaxWidth())
         }
 
-        AndroidView(
-            modifier = Modifier
+        Box(
+            Modifier
                 .weight(1f)
                 .fillMaxWidth(),
-            factory = { ctx ->
-                WebView(ctx).apply {
-                    layoutParams = ViewGroup.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                    )
-                    settings.javaScriptEnabled = true
-                    settings.domStorageEnabled = true
-                    settings.userAgentString = Prober.UA
-                    settings.loadWithOverviewMode = true
-                    settings.useWideViewPort = true
-                    webView = this
+        ) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { ctx ->
+                    WebView(ctx).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                        )
+                        settings.javaScriptEnabled = true
+                        settings.domStorageEnabled = true
+                        settings.userAgentString = Prober.UA
+                        settings.loadWithOverviewMode = true
+                        settings.useWideViewPort = true
+                        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                        webView = this
 
-                    webViewClient = object : WebViewClient() {
-                        override fun onPageStarted(v: WebView?, url: String?, favicon: Bitmap?) {
-                            address = url ?: address
-                            canGoBack = v?.canGoBack() ?: false
-                            canGoForward = v?.canGoForward() ?: false
-                            media.clear()
-                        }
-
-                        override fun onPageFinished(v: WebView?, url: String?) {
-                            canGoBack = v?.canGoBack() ?: false
-                            canGoForward = v?.canGoForward() ?: false
-                            if (!snifferEnabled || v == null) return
-                            v.evaluateJavascript(Sniffer.PROBE_JS) { raw ->
-                                absorb(Sniffer.parseProbeResult(raw))
+                        webViewClient = object : WebViewClient() {
+                            override fun onPageStarted(v: WebView?, url: String?, favicon: Bitmap?) {
+                                // Backing out to about:blank must land on the start
+                                // page, not on an empty white WebView.
+                                val blank = url == "about:blank"
+                                address = if (blank) "" else url ?: address
+                                if (blank) showStart = true
+                                canGoBack = v?.canGoBack() ?: false
+                                canGoForward = v?.canGoForward() ?: false
+                                media.clear()
                             }
-                        }
 
-                        override fun shouldInterceptRequest(
-                            view: WebView?,
-                            request: WebResourceRequest?,
-                        ): WebResourceResponse? {
-                            if (snifferEnabled && request != null) {
-                                val u = request.url.toString()
-                                val kind = SniffedMedia.kindOf(u, null)
-                                if (kind == SniffedMedia.Kind.VIDEO ||
-                                    kind == SniffedMedia.Kind.AUDIO ||
-                                    kind == SniffedMedia.Kind.HLS ||
-                                    kind == SniffedMedia.Kind.DASH
-                                ) {
-                                    absorb(
-                                        listOf(
-                                            SniffedMedia(
-                                                url = u,
-                                                kind = kind,
-                                                title = u.substringAfterLast('/').substringBefore('?'),
-                                                fromNetwork = true,
-                                            ),
-                                        ),
-                                    )
+                            override fun onPageFinished(v: WebView?, url: String?) {
+                                canGoBack = v?.canGoBack() ?: false
+                                canGoForward = v?.canGoForward() ?: false
+                                if (!snifferEnabled || v == null) return
+                                v.evaluateJavascript(Sniffer.PROBE_JS) { raw ->
+                                    absorb(Sniffer.parseProbeResult(raw))
                                 }
                             }
-                            return null
+
+                            override fun shouldInterceptRequest(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                            ): WebResourceResponse? {
+                                if (snifferEnabled && request != null) {
+                                    val u = request.url.toString()
+                                    val kind = SniffedMedia.kindOf(u, null)
+                                    if (kind == SniffedMedia.Kind.VIDEO ||
+                                        kind == SniffedMedia.Kind.AUDIO ||
+                                        kind == SniffedMedia.Kind.HLS ||
+                                        kind == SniffedMedia.Kind.DASH
+                                    ) {
+                                        absorb(
+                                            listOf(
+                                                SniffedMedia(
+                                                    url = u,
+                                                    kind = kind,
+                                                    title = u.substringAfterLast('/').substringBefore('?'),
+                                                    fromNetwork = true,
+                                                ),
+                                            ),
+                                        )
+                                    }
+                                }
+                                return null
+                            }
                         }
                     }
-                }
-            },
-            update = { webView = it },
-        )
+                },
+                update = { webView = it },
+            )
+
+            if (showStart) {
+                StartPage(
+                    onSubmit = { navigate(it) },
+                    onOpen = { url ->
+                        showStart = false
+                        webView?.loadUrl(url)
+                    },
+                )
+            }
+        }
     }
 
     if (showMedia) {
@@ -293,6 +331,68 @@ fun BrowseScreen() {
                 }
                 Spacer(Modifier.height(20.dp))
             }
+        }
+    }
+}
+
+/** Shares the default with SettingsScreen; DuckDuckGo is unreachable on mainland networks. */
+private const val SEARCH_DEFAULT = "https://cn.bing.com/search?q="
+
+private data class QuickSite(val label: String, val url: String)
+
+private val QUICK_SITES = listOf(
+    QuickSite("百度", "https://www.baidu.com"),
+    QuickSite("Bing", "https://cn.bing.com"),
+    QuickSite("哔哩哔哩", "https://m.bilibili.com"),
+    QuickSite("知乎", "https://www.zhihu.com"),
+    QuickSite("GitHub", "https://github.com"),
+    QuickSite("豆瓣", "https://m.douban.com"),
+)
+
+/** Blank-page replacement: one input and a few shortcuts, nothing else. */
+@Composable
+private fun StartPage(
+    onSubmit: (String) -> Unit,
+    onOpen: (String) -> Unit,
+) {
+    var text by remember { mutableStateOf("") }
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .padding(horizontal = 20.dp),
+    ) {
+        Spacer(Modifier.height(48.dp))
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            placeholder = { Text("搜索或输入网址") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Uri,
+                imeAction = ImeAction.Go,
+            ),
+            keyboardActions = KeyboardActions(onGo = { if (text.isNotBlank()) onSubmit(text) }),
+        )
+        Spacer(Modifier.height(24.dp))
+        QUICK_SITES.chunked(3).forEach { row ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                row.forEach { site ->
+                    OutlinedButton(
+                        onClick = { onOpen(site.url) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(site.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+            Spacer(Modifier.height(10.dp))
         }
     }
 }

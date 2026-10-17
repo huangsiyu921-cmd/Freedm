@@ -6,21 +6,23 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,7 +35,6 @@ import app.freedm.ui.ShareBus
 import app.freedm.ui.firstUrl
 import app.freedm.ui.screens.BrowseScreen
 import app.freedm.ui.screens.DownloadsScreen
-import app.freedm.ui.screens.LibraryScreen
 import app.freedm.ui.screens.PrivacyScreen
 import app.freedm.ui.screens.SettingsScreen
 import app.freedm.ui.screens.TaskDetailScreen
@@ -72,7 +73,15 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FreeDmTheme {
-                AppRoot(scope)
+                // Window background is white (§themes.xml), so paint the whole
+                // root with the theme colour rather than letting it show through
+                // around native views.
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background,
+                ) {
+                    AppRoot(scope)
+                }
             }
         }
     }
@@ -114,13 +123,19 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab { DOWNLOADS, BROWSE, LIBRARY, SETTINGS }
+private enum class Tab { DOWNLOADS, BROWSE, SETTINGS }
 
 @Composable
 private fun AppRoot(scope: CoroutineScope) {
     var tab by remember { mutableStateOf(Tab.DOWNLOADS) }
     var detailId by remember { mutableStateOf<Long?>(null) }
     var showPrivacy by remember { mutableStateOf(false) }
+
+    // System back (button or edge gesture): unwind one layer at a time. The
+    // innermost handler registered last wins, so overlays beat the tab reset.
+    BackHandler(enabled = tab != Tab.DOWNLOADS) { tab = Tab.DOWNLOADS }
+    BackHandler(enabled = detailId != null) { detailId = null }
+    BackHandler(enabled = showPrivacy) { showPrivacy = false }
 
     if (showPrivacy) {
         PrivacyScreen(onBack = { showPrivacy = false })
@@ -147,12 +162,6 @@ private fun AppRoot(scope: CoroutineScope) {
                     label = { Text("浏览") },
                 )
                 NavigationBarItem(
-                    selected = tab == Tab.LIBRARY,
-                    onClick = { tab = Tab.LIBRARY },
-                    icon = { Icon(Icons.Default.CheckCircle, contentDescription = null) },
-                    label = { Text("已完成") },
-                )
-                NavigationBarItem(
                     selected = tab == Tab.SETTINGS,
                     onClick = { tab = Tab.SETTINGS },
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
@@ -169,7 +178,6 @@ private fun AppRoot(scope: CoroutineScope) {
             when (tab) {
                 Tab.DOWNLOADS -> DownloadsScreen(scope = scope, onOpenDetail = { detailId = it })
                 Tab.BROWSE -> BrowseScreen()
-                Tab.LIBRARY -> LibraryScreen()
                 Tab.SETTINGS -> SettingsScreen(onOpenPrivacy = { showPrivacy = true })
             }
         }

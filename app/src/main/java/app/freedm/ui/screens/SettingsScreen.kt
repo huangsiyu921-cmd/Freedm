@@ -129,9 +129,10 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
             item { GroupTitle("浏览与嗅探") }
             item {
                 val engines = listOf(
-                    "DuckDuckGo" to "https://duckduckgo.com/?q=",
+                    "Bing" to "https://cn.bing.com/search?q=",
+                    "百度" to "https://www.baidu.com/s?wd=",
                     "Google" to "https://www.google.com/search?q=",
-                    "Bing" to "https://www.bing.com/search?q=",
+                    "DuckDuckGo" to "https://duckduckgo.com/?q=",
                 )
                 val saved = prefs.getString("search_engine", engines[0].second)
                 var idx by remember {

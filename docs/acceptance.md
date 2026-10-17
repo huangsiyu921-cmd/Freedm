@@ -25,7 +25,7 @@ adb install -r app-debug.apk
 adb shell am start -n app.freedm/.MainActivity
 adb logcat -d | findstr "FATAL EXCEPTION"
 ```
-判定：进程存活、无 `FATAL EXCEPTION`、四个底部导航页可切换。
+判定：进程存活、无 `FATAL EXCEPTION`、三个底部导航页（下载 / 浏览 / 设置）可切换。
 
 ### A3 单段下载 — `PASS`
 

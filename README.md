@@ -24,7 +24,10 @@
 - **队列**：全局并发 1–8，FIFO，仅 Wi-Fi 约束，失败指数退避重试 3 次
 - **限速**：全局令牌桶（0–10 MB/s）
 - **通知**：前台进度条、全部暂停、完成/失败提示
-- **浏览器**：WebView + 媒体嗅探（DOM 扫描 + 网络层拦截），识别 HLS/DASH 清单
+- **列表**：单页四筛选（全部 / 进行中 / 已完成 / 错误），分段进度条铺满整行背景
+- **已完成**：点行直接打开文件；右键菜单看详细信息、重新下载、删除
+- **浏览器**：WebView + 媒体嗅探（DOM 扫描 + 网络层拦截），识别 HLS/DASH 清单；
+  起始页带搜索框与常用站点，返回键逐层回退（历史 → 起始页 → 下载页 → 退出）
 - **分享接收**：`ACTION_SEND` / `ACTION_VIEW` 直接建任务
 - **剪贴板识别**：默认关闭，仅前台生效，不保存原文
 - **导出**：可选复制到系统 Downloads（MediaStore）
@@ -45,13 +48,13 @@
 
 ```
 app/src/main/java/app/freedm/
-  MainActivity.kt          单 Activity，底部导航 + 路由
+  MainActivity.kt          单 Activity，三个底部 tab + 逐层返回
   data/  Model.kt Db.kt Repo.kt     数据模型 / SQLiteOpenHelper / 仓储
   engine/ Prober.kt Engine.kt       探测与文件名推导 / 分段下载调度
           RateLimiter.kt Exporter.kt 全局限速 / 导出到公共目录
   service/ DownloadService.kt Notifier.kt   前台服务 / 终态通知
   browser/ Sniffer.kt ClipboardWatcher.kt   媒体嗅探 / 剪贴板识别
-  ui/ screens/ theme/                Compose 界面
+  ui/ screens/ components/ theme/    Compose 界面；components/ 是分段进度条
 tools/    range_server.py（Range 测试源）· parse_dump.py（UI 自动化取坐标）
           check_doc_coverage.py（机械核对代码常量是否都写进了文档）
 docs/     README.md（文档导读：按什么顺序读）
@@ -80,6 +83,11 @@ docs/     README.md（文档导读：按什么顺序读）
 | 全局限速 | 设 500 KB/s，实测 **459 KB/s**（回环不限速可达数十 MB/s） |
 | 完成通知 | `dumpsys notification` 出现 `channel=download_done` |
 | 分享接收 | `ACTION_SEND` → 弹出「新建下载」且 URL 已预填 |
+| 真机冷启动 | Android 16 / arm64（荣耀 MAA-AN00），无崩溃 |
+| 真机分段下载 | 48.9 MB / 8 段，落盘大小与远端 `Content-Length` 一致 |
+| 分段进度条 | 行背景逐段着色，完成后整行纯色（与下载中同色） |
+| 已完成行点击 | 直接调系统「打开方式」，不再先进详情页 |
+| 返回逐层 | 网页历史 → 起始页 → 下载页 → 退出 |
 | 隐私基线 | 权限 6 项；设备标识 API 零命中；无分析 SDK |
 
 详细步骤与判定标准见 [`docs/acceptance.md`](docs/acceptance.md)。
@@ -87,7 +95,7 @@ docs/     README.md（文档导读：按什么顺序读）
 ## 已知限制
 
 - **HLS(`.m3u8`) 只作单文件下载**，无分片合并（UI 已提示）
-- **UI 缺口**：任务列表长按多选、已完成页搜索/筛选、添加下载时更改保存位置 —— 均未实现
+- **UI 缺口**：任务列表长按多选、添加下载时更改保存位置 —— 未实现
 - 浏览器无多标签、无广告拦截、无密码管理
 - 未做 torrent
 - release 签名与 `proguard` 规则未实测

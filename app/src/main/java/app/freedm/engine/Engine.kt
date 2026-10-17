@@ -32,7 +32,13 @@ import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
-data class TaskProgress(val downloaded: Long, val total: Long, val bytesPerSec: Long)
+data class TaskProgress(
+    val downloaded: Long,
+    val total: Long,
+    val bytesPerSec: Long,
+    /** Per-segment completion 0..1, index == segment index. Drives the segmented bar. */
+    val segmentPercents: List<Float> = emptyList(),
+)
 
 /**
  * Segmented HTTP downloader.
@@ -198,7 +204,12 @@ object Engine {
                     val now = System.currentTimeMillis()
                     val bytes = counter.get()
                     val bps = if (now > lastFlush) (bytes - lastBytes) * 1000 / (now - lastFlush) else 0
-                    progressData[id] = TaskProgress(bytes, total, bps)
+                    val pcts = plan.map { seg ->
+                        val w = segProgress.getValue(seg).get()
+                        val len = if (seg.endByte == Long.MAX_VALUE) -1L else seg.length
+                        if (len > 0) (w.toFloat() / len).coerceIn(0f, 1f) else 0f
+                    }
+                    progressData[id] = TaskProgress(bytes, total, bps, pcts)
                     publish()
                     Repo.fastProgress(id, bytes, total)
                     // Flush per-segment offsets on whichever comes first: one second
