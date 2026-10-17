@@ -1343,13 +1343,10 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                                         body.startsWith("FREEDM_MFA_SEND ") ->
                                             Toast.makeText(
                                                 ctx,
-                                                when {
-                                                    body.contains("\"code\":0") &&
-                                                        !body.contains("\"biz\":0") &&
-                                                        !body.contains("\"biz\":null") ->
-                                                        "发送失败"
-                                                    else -> "验证码已发送"
-                                                },
+                                                // `biz_code` can be a rate-limit warning while
+                                                // the mail still goes out, so do not call it a
+                                                // failure — tell the user to check the mailbox.
+                                                "已请求发送，请查收邮箱",
                                                 Toast.LENGTH_SHORT,
                                             ).show()
 
@@ -1691,8 +1688,8 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
             text = {
                 Column {
                     Text(
-                        "这个账号开了两步验证。填写之前收到的那条验证码即可；" +
-                            "App 里发不出去（发送需要人机验证令牌，只有网页自己能拿）。",
+                        "这个账号开了两步验证。点「发送验证码」后查收邮箱；" +
+                            "没收到也可以填之前那条（有效期较长）。",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1708,17 +1705,25 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                 }
             },
             confirmButton = {
-                // Digits and letters only: the value is inlined into a JS call.
-                val clean = mfaCode.filter { it.isLetterOrDigit() }
-                TextButton(
-                    enabled = clean.isNotEmpty(),
-                    onClick = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = {
                         webView?.evaluateJavascript(
-                            "window.__freedmMfaCheck && window.__freedmMfaCheck('$clean')",
+                            "window.__freedmMfaSend && window.__freedmMfaSend()",
                             null,
                         )
-                    },
-                ) { Text("验证") }
+                    }) { Text("发送验证码") }
+                    // Digits and letters only: the value is inlined into a JS call.
+                    val clean = mfaCode.filter { it.isLetterOrDigit() }
+                    TextButton(
+                        enabled = clean.isNotEmpty(),
+                        onClick = {
+                            webView?.evaluateJavascript(
+                                "window.__freedmMfaCheck && window.__freedmMfaCheck('$clean')",
+                                null,
+                            )
+                        },
+                    ) { Text("验证") }
+                }
             },
             dismissButton = {
                 TextButton(onClick = { mfaSid = null }) { Text("取消") }
