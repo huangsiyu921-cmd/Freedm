@@ -49,7 +49,7 @@
 也可以在 Android Studio 里直接 Sync + Build，release 用 `Generate Signed APK` 选自己的 keystore。
 
 - **applicationId**：`com.huangsy.freedm`（Java 包名仍为 `app.freedm`）
-- **版本**：0.1.5（versionCode 6）
+- **版本**：0.1.6（versionCode 7）
 - **工具链**：AGP 8.5.2 / Kotlin 2.1.20 / Compose BOM 2024.10.01 / Gradle 8.7 / JDK 17
 - **可复现性**：wrapper 与依赖版本全部写死（无动态版本号），同工具链下行为一致；APK 本身是非字节级可复现（含时间戳与签名）。首次构建需联网拉依赖，之后 `--offline` 可用。
 
