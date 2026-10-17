@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -18,7 +19,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.RadioButton
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -71,23 +74,21 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
         LazyColumn(Modifier.fillMaxSize().padding(pad)) {
             item { GroupTitle("个性化") }
             item {
-                Column {
-                    ThemeRow("跟随系统", themeMode == "system") {
-                        themeMode = "system"
-                        prefs.edit().putString(THEME_MODE, "system").apply()
+                // One row per setting: label on the left, choices inline.
+                ChoiceRow(
+                    label = "主题",
+                    options = listOf(
+                        "system" to "跟随系统",
+                        "light" to "亮色",
+                        "dark" to "暗色",
+                    ),
+                    selected = themeMode,
+                    onSelect = {
+                        themeMode = it
+                        prefs.edit().putString(THEME_MODE, it).apply()
                         Repo.bumpTheme()
-                    }
-                    ThemeRow("亮色", themeMode == "light") {
-                        themeMode = "light"
-                        prefs.edit().putString(THEME_MODE, "light").apply()
-                        Repo.bumpTheme()
-                    }
-                    ThemeRow("暗色", themeMode == "dark") {
-                        themeMode = "dark"
-                        prefs.edit().putString(THEME_MODE, "dark").apply()
-                        Repo.bumpTheme()
-                    }
-                }
+                    },
+                )
             }
             item {
                 val supported = android.os.Build.VERSION.SDK_INT >= 31
@@ -105,27 +106,19 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
                 )
             }
             item {
-                Text(
-                    "启动页",
-                    style = MaterialTheme.typography.titleSmall,
-                    modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 2.dp),
+                ChoiceRow(
+                    label = "启动页",
+                    options = listOf(
+                        "downloads" to "下载",
+                        "browse" to "浏览",
+                        "settings" to "设置",
+                    ),
+                    selected = startTab,
+                    onSelect = {
+                        startTab = it
+                        prefs.edit().putString(START_TAB, it).apply()
+                    },
                 )
-            }
-            item {
-                Column {
-                    ThemeRow("下载", startTab == "downloads") {
-                        startTab = "downloads"
-                        prefs.edit().putString(START_TAB, "downloads").apply()
-                    }
-                    ThemeRow("浏览", startTab == "browse") {
-                        startTab = "browse"
-                        prefs.edit().putString(START_TAB, "browse").apply()
-                    }
-                    ThemeRow("设置", startTab == "settings") {
-                        startTab = "settings"
-                        prefs.edit().putString(START_TAB, "settings").apply()
-                    }
-                }
             }
 
             item { GroupTitle("下载") }
@@ -478,16 +471,34 @@ private fun SliderRow(
 }
 
 @Composable
-private fun ThemeRow(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun ChoiceRow(
+    label: String,
+    options: List<Pair<String, String>>,
+    selected: String,
+    onSelect: (String) -> Unit,
+) {
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 10.dp),
+            .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-        RadioButton(selected = selected, onClick = onClick)
+        Text(
+            label,
+            style = MaterialTheme.typography.bodyLarge,
+            modifier = Modifier.width(64.dp),
+        )
+        SingleChoiceSegmentedButtonRow(Modifier.weight(1f)) {
+            options.forEachIndexed { i, (value, text) ->
+                SegmentedButton(
+                    selected = selected == value,
+                    onClick = { onSelect(value) },
+                    shape = SegmentedButtonDefaults.itemShape(index = i, count = options.size),
+                ) {
+                    Text(text, maxLines = 1, fontSize = 12.sp)
+                }
+            }
+        }
     }
 }
 

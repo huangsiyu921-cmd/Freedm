@@ -244,14 +244,19 @@ fun StartPage(
                         BackCard(
                             site = back,
                             modifier = Modifier
-                                .fillMaxWidth(0.86f)
-                                .height(148.dp)
+                                .fillMaxWidth(if (depth == 1) 0.90f else 0.87f)
+                                .height(160.dp)
                                 .graphicsLayer {
-                                    val s = 1f - depth * 0.05f
-                                    scaleX = s
-                                    scaleY = s
-                                    translationY = depth * 17.dp.toPx()
-                                    alpha = if (depth == 1) 0.9f else 0.65f
+                                    // Classic card-pile: each card below is a little
+                                    // narrower and pushed further down, so the stack
+                                    // reads as stacked sheets rather than one shrinking
+                                    // card blurred into the next.
+                                    translationY = depth * 18.dp.toPx()
+                                    // Fade out while a drag is in flight so the
+                                    // neighbour card never overlaps a static one.
+                                    val fade = (1f - abs(dragX) / (cardWidth.floatValue * 0.35f))
+                                        .coerceIn(0f, 1f)
+                                    alpha = (if (depth == 1) 0.95f else 0.75f) * fade
                                 },
                         )
                     }
@@ -508,7 +513,7 @@ private fun AddCard(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .clip(RoundedCornerShape(26.dp))
-            .background(scheme.surfaceVariant)
+            .background(scheme.surfaceVariant.copy(alpha = 0.35f))
             .border(
                 BorderStroke(2.dp, scheme.outlineVariant),
                 RoundedCornerShape(26.dp),
