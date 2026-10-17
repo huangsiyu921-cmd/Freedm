@@ -146,6 +146,23 @@ adb shell am start -a android.intent.action.SEND -t text/plain \
 **退到后台后复制 → 不应有任何反应**（`onPause` 已注销监听）。
 注入剪贴板的可行手段：app 内输入框手动复制，或用 `service call clipboard`（各版本 transaction code 不同，不稳定）。
 
+### B4 广告过滤 — `PASS`
+
+```powershell
+adb shell am start -n com.huangsy.freedm.dev/app.freedm.MainActivity
+# 浏览 tab → 打开一个有统计脚本的页面（实测 https://www.baidu.com/）
+# 右上 ⋮ → 观察「☑ 广告过滤（已拦 N）」
+adb shell run-as com.huangsy.freedm.dev cat shared_prefs/settings.xml   # 看 adblock_allow
+```
+
+判定：
+1. 菜单里拦截计数 **> 0**（实测百度首页 3 条：`hm.baidu.com` 等）。
+2. 点「本站关闭过滤」后菜单变成「本站恢复过滤」，`settings.xml` 出现 `adblock_allow` 含该 host，重载后计数不再增长。
+3. 再点「本站恢复过滤」→ 白名单清空（`<set name="adblock_allow" />`）。
+4. 页面本身永远正常显示（主文档不拦）。
+
+规则与匹配逻辑见 `docs/logic-spec.md` §19；名单文件 `app/src/main/assets/adblock_hosts.txt`。
+
 ---
 
 ## C. 隐私基线
@@ -168,6 +185,7 @@ adb shell am start -a android.intent.action.SEND -t text/plain \
 ## D. 已知未实现（不是 bug，是范围）
 
 - HLS(`.m3u8`) 只作单文件下载，**无分片合并**
-- 无多标签浏览器、无广告拦截、无密码管理、无主题市场
+- 广告过滤只按域名拦截，**不处理页面内联广告位**；规则随安装包更新，不联网订阅
+- 无密码管理、无主题市场
 - 无 torrent
 - release 签名与 `proguard` 规则未配置实测

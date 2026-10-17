@@ -112,7 +112,13 @@ fun TaskDetailScreen(id: Long, onBack: () -> Unit) {
                         )
                     }
                     Spacer(Modifier.padding(4.dp))
-                    OutlinedButton(onClick = { Repo.delete(task.id, deleteFiles = true); onBack() }) {
+                    OutlinedButton(
+                        onClick = {
+                            Engine.forget(task.id)
+                            Repo.delete(task.id, deleteFiles = true)
+                            onBack()
+                        },
+                    ) {
                         Text("删除")
                     }
                 }

@@ -193,7 +193,12 @@ fun DownloadsScreen(
                                 null
                             },
                             onRedownload = { redownload(t) },
-                            onDelete = { Repo.delete(t.id, deleteFiles = true) },
+                            onDelete = {
+                                // Stop the transfer first: its threads hold the
+                                // file open and would keep writing a deleted row.
+                                Engine.forget(t.id)
+                                Repo.delete(t.id, deleteFiles = true)
+                            },
                         )
                     }
                     item { Spacer(Modifier.height(72.dp)) }

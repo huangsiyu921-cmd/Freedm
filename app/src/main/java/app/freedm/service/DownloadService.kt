@@ -18,7 +18,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
@@ -151,8 +151,10 @@ class DownloadService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        // The scope collects Repo.tasks and Engine.progress forever; a service
+        // that is gone must not keep a subscriber (and a Service reference) alive.
+        scope.cancel()
         observer?.cancel()
-        scope.launch { runCatching { delay(0) } }
         super.onDestroy()
     }
 

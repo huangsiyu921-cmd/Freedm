@@ -39,13 +39,27 @@ object FaviconColor {
             setRequestProperty("User-Agent", userAgent)
         }
         try {
-            val bytes = conn.inputStream.use { it.readBytes() }
-            if (bytes.size > 512 * 1024) return@runCatching null
+            // Cap while reading: a bogus host can answer with an endless body, and
+            // readBytes() would happily fill the heap before the size check ran.
+            val out = java.io.ByteArrayOutputStream(16 * 1024)
+            val chunk = ByteArray(8 * 1024)
+            conn.inputStream.use { input ->
+                while (true) {
+                    val n = input.read(chunk)
+                    if (n <= 0) break
+                    if (out.size() + n > MAX_ICON_BYTES) return@runCatching null
+                    out.write(chunk, 0, n)
+                }
+            }
+            val bytes = out.toByteArray()
+            if (bytes.isEmpty()) return@runCatching null
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
         } finally {
             runCatching { conn.disconnect() }
         }
     }.getOrNull()
+
+    private const val MAX_ICON_BYTES = 512 * 1024
 
     private fun dominant(src: Bitmap): Int? {
         val scaled = Bitmap.createScaledBitmap(src, 24, 24, true)

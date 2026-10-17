@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.freedm.browser.AdBlocker
 import app.freedm.data.Repo
 import app.freedm.engine.Engine
 import app.freedm.ui.theme.START_TAB
@@ -60,8 +61,9 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
     var wifiOnly by remember { mutableStateOf(prefs.getBoolean("wifi_only", false)) }
     var autoResume by remember { mutableStateOf(prefs.getBoolean("auto_resume", true)) }
     var exportPublic by remember { mutableStateOf(prefs.getBoolean("export_public", true)) }
-    var autoCategorize by remember { mutableStateOf(prefs.getBoolean("auto_categorize", false)) }
+    var autoCategorize by remember { mutableStateOf(prefs.getBoolean("auto_categorize", true)) }
     var sniff by remember { mutableStateOf(prefs.getBoolean("sniff", true)) }
+    var adblock by remember { mutableStateOf(AdBlocker.isEnabled()) }
     var desktopUa by remember { mutableStateOf(prefs.getBoolean("desktop_ua", false)) }
     var jsEnabled by remember { mutableStateOf(prefs.getBoolean("js_enabled", true)) }
     var rememberPage by remember { mutableStateOf(prefs.getBoolean("remember_page", false)) }
@@ -291,6 +293,17 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
                     onChange = {
                         sniff = it
                         prefs.edit().putBoolean("sniff", it).apply()
+                    },
+                )
+            }
+            item {
+                SwitchRow(
+                    label = "广告过滤",
+                    description = "拦截广告与统计域名，可在浏览页按站点关闭",
+                    checked = adblock,
+                    onChange = {
+                        adblock = it
+                        AdBlocker.setEnabled(it)
                     },
                 )
             }

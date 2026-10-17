@@ -227,3 +227,69 @@ val size = if (f.exists()) f.length() else t.totalBytes
 ```
 
 **更彻底的做法**（未实现）：导出成功后把新的 `content://` URI 记进 DB，列表与打开都走它。
+
+---
+
+## 17. 删除运行中的任务，它还会"诈尸"
+
+**现象**：任务跑着的时候点删除，行没了，但下载仍在进行；有时过几秒又弹出「下载完成」通知。
+
+**原因**：`Repo.delete` 只删数据库行，`Engine` 的段线程手里还握着 `RandomAccessFile`，
+照旧往已被删掉的文件 inode 里写；收尾时 `setState(COMPLETED)` 更新 0 行、但通知照发。
+
+**处理**：删除前先让引擎放弃该任务，且引擎的收尾路径先查记录是否还在：
+
+```kotlin
+Engine.forget(t.id)                  // 置暂停标记 + cancel，不发通知
+Repo.delete(t.id, deleteFiles = true)
+
+// Engine.start 的 catch 里 / runTask 完成前
+if (Repo.task(id) == null) return
+```
+
+实测：20 MB 慢速任务在 5% 时删除，服务器两个段连接立即 `ConnectionAborted`，无崩溃、无残留行。
+
+---
+
+## 18. `pauseAll` 只停正在跑的，"全部暂停"看起来没反应
+
+**原因**：只对 `jobs` 里的任务调 `pause`，队列里的 `QUEUED` 不动。第一个任务停下后
+`pump()` 立刻把下一个拉起来，界面上就是"点了暂停，还在下"。
+
+**处理**：`pauseAll` 里连同 `QUEUED` 一起置 `PAUSED`。
+
+---
+
+## 19. `CoroutineStart.LAZY` 的 job 取消后不会执行 finally
+
+**现象**：偶发某个任务卡在 `QUEUED`，点开始也没用（`jobs.containsKey` 恒为 true）。
+
+**原因**：`Engine.start` 先放进 map 再 `job.start()`。若在两者之间被取消，协程体和
+`finally` 都不执行，map 里留下一条死记录。
+
+**处理**：`pause` 里 `cancelAndJoin()` 之后用两参 `remove` 兜底：
+
+```kotlin
+if (jobs.remove(id, job)) { progressData.remove(id); publish(); Repo.setState(id, PAUSED); pump() }
+```
+
+---
+
+## 20. `shouldInterceptRequest` 不是主线程
+
+**现象**：长时间浏览后偶发状态异常 / 媒体列表越滚越多。
+
+**原因**：这个回调跑在 WebView 自己的线程池里，直接 `mutableStateListOf.add()` 是跨线程写
+Compose 状态；而且每个资源请求都塞一条，永不回收。
+
+**处理**：只往 `ConcurrentLinkedQueue` 里放，主线程 500 ms 抽干合并，`MAX_SNIFFED = 400` 封顶，
+`onPageStarted` 清空队列。广告拦截的判定同样只读 prefs，不碰 Compose 状态。
+
+---
+
+## 21. `readBytes()` 之后才判大小，等于没判
+
+**现象**：抓 favicon 时遇到异常站点，`readBytes()` 已经把整个响应读进内存，之后那句
+`if (bytes.size > 512 * 1024) return null` 只是事后诸葛亮。
+
+**处理**：边读边计数，超限立刻放弃（`FaviconColor.MAX_ICON_BYTES = 512 KiB`）。

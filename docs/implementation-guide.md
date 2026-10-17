@@ -135,6 +135,13 @@ Engine.pauseAll()
 - 写文件必须 `synchronized(raf) { seek; write }` —— `seek`+`write` 不是原子操作
 - 任务进入终态时 `finally` 里 `pump()` 补位，维持并发数
 
+**WebView 线程（浏览器）**
+
+- `shouldInterceptRequest` 跑在 WebView 自己的线程池：只读 `prefs`（线程安全）+ 往
+  `ConcurrentLinkedQueue` 里放候选，**不碰 Compose 状态**
+- 主线程每 500 ms 抽干队列、更新拦截计数；页面切换时清空队列
+- 广告拦截的判定同样只读 prefs，命中后返回空 `WebResourceResponse`
+
 **关键不变量**
 
 - `download.downloaded` 会**略微超前**于 `sum(segment.downloaded)`（前者 500 ms 刷、后者 1 s 或 1 MiB 刷）。这是正常的，**续传只读 segment**。
@@ -164,9 +171,14 @@ Engine.pauseAll()
 | 文件名上限 | 120 字符 | `FileNamer.sanitize` |
 | 重名后缀 | ` (1)`…` (999)` | `FileNamer.uniqueIn` |
 | 嗅探单次上限 | 50 条 | `Sniffer.PROBE_JS` |
+| 嗅探结果上限 | 400 条 | `BrowseScreen` 的 `MAX_SNIFFED` |
 | 嗅探视口阈值 | `clientWidth/Height > 100` | `Sniffer.PROBE_JS` |
+| favicon 读取上限 | 512 KiB | `FaviconColor` |
+| favicon 连接/读超时 | 6 s / 6 s | `FaviconColor` |
+| 广告过滤默认 | 开启 | `AdBlocker.PREF_ENABLED` |
+| 广告规则文件 | `assets/adblock_hosts.txt` | `AdBlocker.ASSET` |
 | 前台通知 id | 1001 | `DownloadService` |
-| 终态通知 id | `path.hashCode()` / `fileName.hashCode()` | `Notifier` |
+| 终态通知 id | 任务 id | `Notifier` |
 | 数据库 | `downloads.db`，version 1 | `Db` |
 | 通知渠道 | `download_progress`(LOW, 静音) / `download_done`(DEFAULT) | `DownloadService` |
 | 限速令牌桶容量 | 1 秒的量 | `RateLimiter` |
@@ -188,6 +200,7 @@ Engine.pauseAll()
 | `service/DownloadService.kt` | 前台服务 + 进度通知 | Engine, Repo |
 | `service/Notifier.kt` | 完成/失败通知 + FileProvider 打开文件 | — |
 | `browser/Sniffer.kt` | 嗅探脚本常量 + 结果解析 + 类型判定 | — |
+| `browser/AdBlocker.kt` | 域名名单加载与匹配、站点白名单、拦截计数 | Repo |
 | `browser/ClipboardWatcher.kt` | 前台剪贴板监听（默认关） | Repo |
 | `ui/*` | Compose 界面，只通过 Repo/Engine 的公开方法操作 | 全部 |
 

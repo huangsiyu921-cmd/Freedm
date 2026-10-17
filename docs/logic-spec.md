@@ -297,6 +297,7 @@ while (start < total):
 - `acceptRanges` 必须再 `&& total > 0`：不知道总大小就无法算区间。
 - `finalUrl` 取 `conn.url`（已跟随重定向），不是入参 `url`。
 - 整个函数在 IO 线程调用；任何异常向上抛，由 `runTask` 或调用方 `runCatching` 处理。
+- 两个超时常量同为 `TIMEOUT = 20_000` ms（连接与读），`open()` 里两处都用它。
 
 ## 3.2 `FileNamer.fromHeaders(disposition, url, mime)` → String?
 
@@ -798,13 +799,21 @@ parseProbeResult(raw):
 ## 9.3 网络层补充
 
 ```
-shouldInterceptRequest(request):
-    if (!sniff 开启) ⊥ null（放行）
+shouldInterceptRequest(request):            // WebView 线程，不是主线程
+    if (request == null) ⊥ null
     u ← request.url
+    if (!isForMainFrame && AdBlocker.shouldBlock(u, pageHost)) → 空响应（见 §19）
+    if (!prefs["sniff"]) ⊥ null
     kind ← kindOf(u, null)
-    if (kind ∈ {VIDEO, AUDIO, HLS, DASH}) 收进结果集（fromNetwork=true）
-    ⊥ null（永不拦截请求本身）
+    if (kind ≠ FILE) sniffQueue.add(媒体候选)      // 线程安全队列，不碰 Compose 状态
+    ⊥ null（永不拦截请求本身，广告例外见 §19）
+
+主线程（500 ms 循环）:
+    drain sniffQueue → absorb(batch) ; 同步拦截计数
 ```
+
+`absorb` 的合并规则：按 `key`（§9.5）去重；**总数上限 `MAX_SNIFFED = 400`**，达到后丢弃新候选。
+页面切换（`onPageStarted`）清空结果集与队列——否则长时间浏览会一直累加，既吃内存也让面板不可用。
 
 **局限**：这个回调拿不到响应体和响应头，只能按 URL 后缀猜类型。
 真实 MIME 只能靠 DOM 扫描补。已记入已知缺陷。
@@ -1410,7 +1419,96 @@ Repo.create(url, fileName, dirPath, threads, wifiOnly, probe):
 | 扩展名未知但 MIME 是 `audio/*` | `MUSIC` |
 | `bin` 扩展名 | 镜像集优先 → `OTHER`（不会被判成 `PROGRAM`） |
 | 归档开启但子目录不存在 | `mkdirs()` 后写入 |
-| 归档关闭（默认） | 全部平铺在下载根目录，与上游产品一致 |
+| 归档关闭 | 全部平铺在下载根目录，与上游产品一致 |
 | 归档后用户改设置 | 只影响新任务；旧任务路径不变 |
 | 分类结果是否需要落库 | **不需要**。纯函数，从文件名现算即可；落库反而要处理改名失效 |
+
+> `auto_categorize` 默认 **true**（`Repo.create` 与设置页同默认），首次使用即按类型归档。
+
+---
+
+# 第 19 部分 · 广告过滤（AdBlocker）
+
+内置浏览器在 `shouldInterceptRequest` 里按域名拦掉广告/统计请求。规则随安装包分发，运行时不联网。
+
+## 19.1 规则来源与匹配
+
+```
+素材: assets/adblock_hosts.txt
+      一行一个域名；'#' 之后是注释；空行忽略；全部转小写
+
+加载: ensureLoaded(ctx)          // 只在第一次调用时读，之后 loaded = true
+      读失败（assets 缺失）→ 视作空规则集，功能退化为"全放行"，不抛异常
+
+匹配: matches(host):
+      loop:
+          if host ∈ rules          → true
+          dot ← host 中第一个 '.'
+          if dot < 0               → false
+          host ← host[dot+1 ..]    // 逐级去子域：ads.a.example.com → a.example.com → example.com
+```
+
+**为什么是"父域回退"而不是通配/正则**：一条 `example.com` 同时覆盖 `ads.example.com`，
+规则可读、可审计，且不会出现"某条正则意外吃掉整站"的情况。代价是路径级规则
+（`/ads/banner.js`）无法表达——这类规则占比小，放弃。
+
+## 19.2 拦截判定与响应
+
+```
+shouldBlock(url, pageHost):
+    if (!prefs["adblock"]，默认 true)                     ⊥ false
+    if (url 不以 http:// 或 https:// 开头)                ⊥ false
+    host ← hostOf(url)                                    // 去 userinfo 与端口，小写
+    if (isSiteAllowed(pageHost ?: host))                  ⊥ false
+    if (!matches(host))                                   ⊥ false
+    blocked.incrementAndGet()
+    ⊥ true
+
+命中后的响应: WebResourceResponse("text/plain", "utf-8", 空字节流)
+            —— 请求被"满足"但内容为空，页面侧表现为资源 200 空体
+```
+
+接线位置（`BrowseScreen` 的 `WebViewClient.shouldInterceptRequest`）：
+
+```
+shouldInterceptRequest(request):
+    if (request == null)                        ⊥ null
+    u ← request.url
+    if (!request.isForMainFrame && shouldBlock(u, pageHost.get())) → 返回空响应
+    if (prefs["sniff"])  把媒体候选塞进 sniffQueue        // 见 §9.3
+    ⊥ null
+```
+
+**主文档永不拦截**（`isForMainFrame` 直接放行）：这是"名单里有站点主域"时不至于整页白屏的兜底。
+
+## 19.3 站点白名单
+
+```
+存储: prefs["adblock_allow"] = Set<String>（小写 host）
+判定: isSiteAllowed(host):
+      逐级去子域，任一级命中白名单 → true
+      含义：对 m.example.com 关闭过滤，example.com 及其所有子域一并放行
+写入: setSiteAllowed(host, allowed) → 增删后立即 apply()，并刷新内存缓存
+```
+
+白名单只影响被访问页面所属的站点（`pageHost`），不影响其他站点。
+
+## 19.4 计数与界面
+
+- `blocked` 是进程内 `AtomicLong`，重启归零；`shouldInterceptRequest` 每拦一次 +1。
+- 界面每 500 ms 拉一次（与嗅探队列同一循环），只用于显示，不参与判定。
+- 入口两处：设置 →「广告过滤」开关；浏览页菜单 →「广告过滤（已拦 N）」+「本站关闭/恢复过滤」。
+  两处改的是同一份 prefs，切换后 `reload()` 让新规则立即生效。
+
+## 19.5 线程与边界
+
+| 情况 | 行为 |
+|---|---|
+| `shouldInterceptRequest` 的线程 | WebView 自己的线程池，**不是主线程**：判定只读 prefs，绝不碰 Compose 状态 |
+| 规则未加载完就有请求 | `matches` 返回 false → 放行（首屏极少数请求漏拦，可接受） |
+| 白名单站点 | 该页所有子资源放行；换成别的站点仍照常拦截 |
+| 域名在名单里但那是主文档 | 放行页面，只拦它的子资源 |
+| 拦截了页面必需的脚本 | 用户在该站点菜单里关闭过滤即可，无需改列表 |
+| 计数 | 同一资源重试会重复 +1，只作观感指标 |
+| 是否联网更新规则 | **否**。规则只随安装包变化（隐私基线：不产生用户未发起的请求） |
 

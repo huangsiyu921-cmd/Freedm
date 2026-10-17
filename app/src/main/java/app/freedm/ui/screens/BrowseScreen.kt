@@ -71,8 +71,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -87,6 +90,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import app.freedm.browser.AdBlocker
 import app.freedm.browser.SniffedMedia
 import app.freedm.browser.Sniffer
 import app.freedm.data.Repo
@@ -97,9 +101,12 @@ import app.freedm.service.DownloadService
 import app.freedm.ui.formatBytes
 import app.freedm.ui.firstUrl
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicReference
 
 /** Extensions that should become a download task instead of a page load. */
 private val DOWNLOAD_EXT = setOf(
@@ -136,6 +143,9 @@ private const val DESKTOP_VIEWPORT_JS = """
 private const val UA_DESKTOP =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+
+/** Upper bound on sniffed candidates; a long browsing session must not grow forever. */
+private const val MAX_SNIFFED = 400
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -205,9 +215,22 @@ fun BrowseScreen() {
     var snifferEnabled by remember { mutableStateOf(prefs.getBoolean("sniff", true)) }
     var desktopUa by remember { mutableStateOf(prefs.getBoolean("desktop_ua", false)) }
 
+    // Ad blocking state mirrored for the menu. The blocking decision itself reads
+    // prefs directly, because shouldInterceptRequest runs off the main thread.
+    var adblockOn by remember { mutableStateOf(AdBlocker.isEnabled()) }
+    var siteAllowed by remember { mutableStateOf(false) }
+    var blockedCount by remember { mutableLongStateOf(0L) }
+    // WebView calls shouldInterceptRequest on its own threads; Compose state may
+    // only be touched from the main thread, so sniffed media is handed over here.
+    val sniffQueue = remember { ConcurrentLinkedQueue<SniffedMedia>() }
+    val pageHost = remember { AtomicReference<String?>(null) }
+
     fun absorb(list: List<SniffedMedia>) {
         val existing = media.map { it.key }.toHashSet()
-        list.forEach { if (existing.add(it.key)) media.add(it) }
+        list.forEach {
+            if (media.size >= MAX_SNIFFED) return
+            if (existing.add(it.key)) media.add(it)
+        }
     }
 
     fun navigate(input: String) {
@@ -304,6 +327,36 @@ fun BrowseScreen() {
 
     fun saveCurrentPage() = startDownload(address)
 
+    // The rule list is read once, off the main thread; this loop also drains what
+    // shouldInterceptRequest queued and mirrors counters into Compose state.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) { AdBlocker.ensureLoaded(ctx) }
+        while (true) {
+            delay(500)
+            if (sniffQueue.isNotEmpty()) {
+                val batch = ArrayList<SniffedMedia>()
+                while (true) batch.add(sniffQueue.poll() ?: break)
+                absorb(batch)
+            }
+            adblockOn = AdBlocker.isEnabled()
+            blockedCount = AdBlocker.blockedCount()
+            siteAllowed = AdBlocker.isSiteAllowed(pageHost.get())
+        }
+    }
+
+    // AndroidView has no onRelease in this Compose version: without an explicit
+    // teardown the WebView (Activity context + its renderer) outlives the screen.
+    DisposableEffect(Unit) {
+        onDispose {
+            webView?.let { wv ->
+                runCatching {
+                    wv.stopLoading()
+                    wv.loadUrl("about:blank")
+                    wv.destroy()
+                }
+            }
+        }
+    }
 
     if (showCookies) {
         SiteDataScreen(onBack = { showCookies = false })
@@ -463,6 +516,24 @@ fun BrowseScreen() {
                         historyOpen = true
                     }
                     HorizontalDivider()
+                    MenuItem(if (adblockOn) "☑ 广告过滤（已拦 $blockedCount）" else "☐ 广告过滤") {
+                        menuOpen = false
+                        adblockOn = !adblockOn
+                        AdBlocker.setEnabled(adblockOn)
+                        webView?.reload()
+                    }
+                    MenuItem(if (siteAllowed) "本站恢复过滤" else "本站关闭过滤") {
+                        menuOpen = false
+                        val host = AdBlocker.hostOf(address)
+                        if (host == null) {
+                            Toast.makeText(ctx, "先打开一个网页", Toast.LENGTH_SHORT).show()
+                        } else {
+                            val allow = !siteAllowed
+                            AdBlocker.setSiteAllowed(host, allow)
+                            siteAllowed = allow
+                            webView?.reload()
+                        }
+                    }
                     MenuItem(if (snifferEnabled) "☑ 嗅探音频/视频" else "☐ 嗅探音频/视频") {
                         menuOpen = false
                         snifferEnabled = !snifferEnabled
@@ -637,9 +708,11 @@ fun BrowseScreen() {
                                 val blank = url == "about:blank"
                                 address = if (blank) "" else url ?: address
                                 if (blank) showStart = true
+                                pageHost.set(AdBlocker.hostOf(url ?: ""))
                                 canGoBack = v?.canGoBack() ?: false
                                 canGoForward = v?.canGoForward() ?: false
                                 media.clear()
+                                sniffQueue.clear()
                             }
 
                             override fun onPageFinished(v: WebView?, url: String?) {
@@ -680,22 +753,28 @@ fun BrowseScreen() {
                                 view: WebView?,
                                 request: WebResourceRequest?,
                             ): WebResourceResponse? {
-                                if (snifferEnabled && request != null) {
-                                    val u = request.url.toString()
+                                if (request == null) return null
+                                val u = request.url.toString()
+
+                                // The document itself is never blocked — a rule that
+                                // happens to match the page would leave a blank tab.
+                                if (!request.isForMainFrame &&
+                                    AdBlocker.shouldBlock(u, pageHost.get())
+                                ) {
+                                    return AdBlocker.emptyResponse()
+                                }
+
+                                // Read prefs rather than Compose state: this callback
+                                // runs on WebView's threads, not the main thread.
+                                if (prefs.getBoolean("sniff", true)) {
                                     val kind = SniffedMedia.kindOf(u, null)
-                                    if (kind == SniffedMedia.Kind.VIDEO ||
-                                        kind == SniffedMedia.Kind.AUDIO ||
-                                        kind == SniffedMedia.Kind.HLS ||
-                                        kind == SniffedMedia.Kind.DASH
-                                    ) {
-                                        absorb(
-                                            listOf(
-                                                SniffedMedia(
-                                                    url = u,
-                                                    kind = kind,
-                                                    title = u.substringAfterLast('/').substringBefore('?'),
-                                                    fromNetwork = true,
-                                                ),
+                                    if (kind != SniffedMedia.Kind.FILE) {
+                                        sniffQueue.add(
+                                            SniffedMedia(
+                                                url = u,
+                                                kind = kind,
+                                                title = u.substringAfterLast('/').substringBefore('?'),
+                                                fromNetwork = true,
                                             ),
                                         )
                                     }

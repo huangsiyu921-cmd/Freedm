@@ -86,9 +86,12 @@ object Engine {
             try {
                 runTask(id)
             } catch (e: CancellationException) {
-                Repo.setState(id, TaskState.PAUSED)
+                // A deleted task has no row left to write back to.
+                if (Repo.task(id) != null) Repo.setState(id, TaskState.PAUSED)
                 throw e
             } catch (t: Throwable) {
+                // Deleting a task cancels it too; it must not resurface as failed.
+                if (Repo.task(id) == null) return@launch
                 val msg = t.message ?: t::class.java.simpleName
                 Repo.setState(id, TaskState.FAILED, msg)
                 Notifier.failed(Repo.context, id, Repo.task(id)?.fileName ?: "下载任务", msg)
@@ -105,12 +108,47 @@ object Engine {
 
     fun pause(id: Long) {
         paused.add(id)
-        jobs[id]?.let { scope.launch { it.cancelAndJoin() } }
-        if (!isRunning(id)) Repo.setState(id, TaskState.PAUSED)
+        val job = jobs[id]
+        if (job == null) {
+            if (Repo.task(id)?.state?.isActive == true) Repo.setState(id, TaskState.PAUSED)
+            return
+        }
+        scope.launch {
+            job.cancelAndJoin()
+            // A job cancelled before its body ever ran does not reach its own
+            // finally, so the bookkeeping is repeated here — but only once:
+            // remove(id, job) fails when the finally already cleaned up.
+            if (jobs.remove(id, job)) {
+                progressData.remove(id)
+                publish()
+                if (Repo.task(id) != null) Repo.setState(id, TaskState.PAUSED)
+                pump()
+            }
+        }
     }
 
     fun pauseAll() {
         jobs.keys.toList().forEach { pause(it) }
+        // Queued tasks are part of "pause everything" too: leaving them QUEUED
+        // means the slot freed by a pausing transfer immediately starts the next
+        // one, and the button looks like it did nothing.
+        Repo.tasks.value
+            .filter { it.state == TaskState.QUEUED }
+            .forEach { Repo.setState(it.id, TaskState.PAUSED) }
+    }
+
+    /**
+     * Abandons a transfer whose record is about to be deleted.
+     *
+     * The threads are cancelled without waiting, so a segment may still be inside
+     * one 64 KiB write when the row disappears; every callback that follows
+     * checks for the row's absence first, so nothing is resurrected or notified.
+     */
+    fun forget(id: Long) {
+        paused.add(id)
+        progressData.remove(id)
+        publish()
+        jobs.remove(id)?.cancel()
     }
 
     /** Starts queued tasks until the concurrency limit is reached. */
@@ -263,6 +301,8 @@ object Engine {
             }
 
             val finalBytes = counter.get()
+            // The row may have been deleted while the last segment finished.
+            if (Repo.task(id) == null) return
             progressData[id] = TaskProgress(finalBytes, total, 0)
             publish()
             Repo.fastProgress(id, finalBytes, total)

@@ -72,8 +72,13 @@ object Repo {
 
     fun init(context: Context) {
         appContext = context.applicationContext
-        helper = Db(appContext)
-        downloadsDir.mkdirs()
+        // Idempotent on purpose: Activity recreation (locale or font-size change
+        // slips past configChanges) must not swap in a second SQLiteOpenHelper
+        // and leak the first one's connection.
+        if (!::helper.isInitialized) {
+            helper = Db(appContext)
+            downloadsDir.mkdirs()
+        }
         // A task that was RUNNING when the process died should continue; one the
         // user explicitly PAUSED must stay paused. Mapping RUNNING->QUEUED here is
         // what keeps those two cases distinguishable across restarts.
