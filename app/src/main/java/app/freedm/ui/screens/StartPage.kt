@@ -15,6 +15,7 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -46,6 +48,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -57,6 +60,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.CornerRadius
@@ -67,20 +71,25 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import app.freedm.browser.FaviconColor
 import app.freedm.data.QuickSite
 import app.freedm.data.Repo
 import app.freedm.data.SiteStore
+import app.freedm.diag.Diag
 import app.freedm.engine.Prober
 import app.freedm.ui.theme.Elev
 import app.freedm.ui.theme.Motion
@@ -90,6 +99,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Shared with SettingsScreen; DuckDuckGo is unreachable on mainland networks. */
 internal const val SEARCH_DEFAULT = "https://cn.bing.com/search?q="
@@ -132,6 +142,14 @@ fun StartPage(
     var unfold by remember { mutableFloatStateOf(0f) }
     var editing by remember { mutableStateOf<QuickSite?>(null) }
     var adding by remember { mutableStateOf(false) }
+    // True while a fold started from the open list is animating, so the release
+    // handler does not settle it back open.
+    var folding by remember { mutableStateOf(false) }
+    // Card-area height in px (needed by both the layout and the grab-bar gesture),
+    // how far the list has been scrolled, and how far the bar has been dragged down.
+    var areaHeightPx by remember { mutableFloatStateOf(0f) }
+    var listOffset by remember { mutableFloatStateOf(0f) }
+    var gripDrag by remember { mutableFloatStateOf(0f) }
 
     // Deck = shortcuts + a trailing "add" card.
     val deck: List<QuickSite?> = remember(sites.size) { sites.toList() + listOf(null) }
@@ -167,16 +185,17 @@ fun StartPage(
         }
     }
 
-    fun flip(direction: Int) {
+    fun flip(direction: Int, speed: Float = 0f) {
         scope.launch {
-            // 1.5 container widths, not 1: the outgoing card is narrower than the
-            // container and sits centred, so a single width leaves a sliver of its
-            // rounded edge visible at the side.
-            val travel = cardWidth.floatValue * 1.5f
+            // Matches the travel used when laying the deck out (1.05 × width): the
+            // card is fully off screen by then, so the animation has nothing to pad.
+            val travel = cardWidth.floatValue * 1.05f
+            // A hard flick finishes faster; a slow drag glides.
+            val duration = 240 - (speed / 6000f).coerceIn(0f, 1f) * 100
             animate(
                 dragX,
                 -direction * travel,
-                animationSpec = Motion.enter,
+                animationSpec = tween(duration.toInt(), easing = Motion.emphasized),
             ) { v: Float, _: Float -> dragX = v }
             index = ((index + direction) % count + count) % count
             // The neighbour card has already travelled to the centre, so reset
@@ -186,6 +205,9 @@ fun StartPage(
     }
 
     fun settleUnfold() {
+        // A fold triggered from the list is already animating; re-settling here
+        // would read unfold > 0.4 mid-animation and bounce it straight back open.
+        if (folding) return
         scope.launch {
             val open = unfold > 0.4f
             animate(
@@ -196,33 +218,98 @@ fun StartPage(
         }
     }
 
+    /** Folding back from the open list: one animation, whichever end was pushed. */
+    fun foldFromList() {
+        if (folding) return
+        folding = true
+        Diag.log("DECK_FOLD", "unfold=$unfold")
+        scope.launch {
+            animate(
+                unfold,
+                0f,
+                animationSpec = Motion.unfold,
+            ) { v: Float, _: Float -> unfold = v }
+            folding = false
+        }
+    }
+
+    /** The grab bar was dragged far enough: let the list fall away, then show the deck. */
+    fun dropListFromDrag() {
+        if (folding) return
+        folding = true
+        scope.launch {
+            val target = areaHeightPx.coerceAtLeast(1f)
+            animate(
+                gripDrag,
+                target,
+                animationSpec = Motion.unfold,
+            ) { v: Float, _: Float -> gripDrag = v }
+            unfold = 0f
+            gripDrag = 0f
+            folding = false
+        }
+    }
+
     Column(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.surface)
             .padding(horizontal = 20.dp),
     ) {
-        Spacer(Modifier.weight(1f))
-        SearchField(value = text, onValueChange = { text = it }, onSubmit = { onSubmit(text) })
+        Spacer(Modifier.height(24.dp))
+        SearchField(
+            value = text,
+            onValueChange = { text = it },
+            onSubmit = { onSubmit(text) },
+        )
         Spacer(Modifier.height(30.dp))
 
+        val listMode = unfold > 0.99f
+        // The card area fills everything between the search field and the bottom
+        // bar. It used to be a fixed 520dp viewport, which meant a scrolled card was
+        // cut flat at the top of that box and only its arc showed at the bottom.
+        val tp = 1f - (1f - unfold) * (1f - unfold)
+        var areaHeightPx by remember { mutableFloatStateOf(0f) }
+        val density = LocalDensity.current
+        val pitchPx = with(density) { 160.dp.toPx() + Space.md.toPx() }
+        var listOffset by remember { mutableFloatStateOf(0f) }
+        // How far the open list has been dragged down by the grab bar. It moves the
+        // cards with the finger instead of folding them upwards.
+        var gripDrag by remember { mutableFloatStateOf(0f) }
+        val maxListOffset = (count * pitchPx - areaHeightPx).coerceAtLeast(0f)
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(250.dp)
-                // One gesture handler for the whole deck area: vertical drags
+                .weight(1f)
+                .clipToBounds()
+                .onSizeChanged {
+                    areaHeightPx = it.height.toFloat()
+                    cardWidth.floatValue = it.width.toFloat()
+                }
+                // One gesture handler for the whole card area: vertical drags
                 // unfold, horizontal drags flip. Keeping it on the container
                 // (not the card) makes the touch target the full row.
-                .pointerInput(count, index) {
+                // Keyed on the deck size only: re-keying on `index` restarted the
+                // detector right after a flip, which is what made a tap flicker.
+                .pointerInput(count, listMode) {
                     awaitEachGesture {
-                        awaitFirstDown(requireUnconsumed = false)
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        folding = false
+                        val tracker = VelocityTracker()
+                        tracker.addPosition(down.uptimeMillis, down.position)
                         var dx = 0f
                         var dy = 0f
                         var axis = 0 // 0 undecided, 1 sideways, 2 vertical
                         val slop = 6.dp.toPx()
                         while (true) {
                             val event = awaitPointerEvent()
+                            event.changes.firstOrNull()?.let {
+                                tracker.addPosition(it.uptimeMillis, it.position)
+                            }
                             if (event.changes.none { it.pressed }) break
+                            // The grab bar or a card may own this gesture; touching the
+                            // bar must not also scroll the list underneath it.
+                            if (event.changes.any { it.isConsumed }) continue
                             val pan = event.calculatePan()
                             dx += pan.x
                             dy += pan.y
@@ -237,24 +324,44 @@ fun StartPage(
                                 dragX += pan.x
                                 event.changes.forEach { it.consume() }
                             } else if (axis == 2) {
-                                // Up = unfold (longer travel), down = fold back (shorter travel).
-                                val travel = if (pan.y < 0f) 1000f else 620f
+                                if (listMode) {
+                                    // The open list only scrolls. Leaving it is the grab
+                                    // bar's job — neither end of the list folds it.
+                                    listOffset = (listOffset - pan.y).coerceIn(0f, maxListOffset)
+                                    event.changes.forEach { it.consume() }
+                                    continue
+                                }
+                                // Up = unfold, down = fold back. The travel is longer than
+                                // the card height on purpose: the gesture felt twitchy when
+                                // a short flick was enough.
+                                val travel = if (pan.y < 0f) 1400f else 900f
                                 unfold = (unfold - pan.y / travel).coerceIn(0f, 1f)
                                 event.changes.forEach { it.consume() }
                             }
                         }
+                        val velocity = tracker.calculateVelocity()
                         when (axis) {
                             1 -> {
                                 val w = size.width.toFloat()
                                 cardWidth.floatValue = w
+                                // A flick flips even without crossing the distance
+                                // threshold, and the flick's speed shortens the
+                                // animation — that is the drift after release.
                                 when {
-                                    dragX < -w * 0.12f -> flip(1)
-                                    dragX > w * 0.12f -> flip(-1)
-                                    else -> scope.launch {
+                                    dragX < -w * 0.20f || velocity.x < -900f ->
+                                        flip(1, abs(velocity.x))
+
+                                    dragX > w * 0.20f || velocity.x > 900f ->
+                                        flip(-1, abs(velocity.x))
+
+                                    // Only animate back when there is something to undo;
+                                    // otherwise every tap started (and cancelled) an
+                                    // animation, which read as a double flash.
+                                    abs(dragX) > 1f -> scope.launch {
                                         animate(
                                             dragX,
                                             0f,
-                                            animationSpec = Motion.settle(),
+                                            animationSpec = Motion.enter,
                                         ) { v: Float, _: Float -> dragX = v }
                                     }
                                 }
@@ -264,202 +371,277 @@ fun StartPage(
                         }
                     }
                 },
-            contentAlignment = Alignment.Center,
+            // Top-start, not centred: every card positions itself with an absolute
+            // offset, and a centred parent would shift all of them by the leftover.
+            contentAlignment = Alignment.TopStart,
         ) {
-            val deckAlpha = (1f - unfold * 2f).coerceIn(0f, 1f)
-            val front = deck.getOrNull(index)
+            val density = LocalDensity.current
+            val w = cardWidth.floatValue
+            // Just over one container width: the front card is 94% wide and centred,
+            // so it is clear of the edge at 1.03w. Anything longer is dead travel —
+            // the card is already gone while the animation runs.
+            val travel = w * 1.05f
+            // < 0 = pulling the next card in, > 0 = pulling the previous one.
+            val pull = (dragX / travel).coerceIn(-1f, 1f)
+            val q = abs(pull)
+            val toNext = pull < 0f
+            // 0 = the deck, 1 = the list of big cards. Every card interpolates
+            // between its deck slot and its list slot, so the deck *unfolds* instead
+            // of one view fading out while another fades in.
+            val t = unfold
 
-            if (deckAlpha > 0.02f) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        // Travel a full container width: the card is centred inside
-                        // it, so using the card's own width left its rounded edge
-                        // peeking back in at the side.
-                        .onSizeChanged { cardWidth.floatValue = it.width.toFloat() }
-                        .graphicsLayer { alpha = deckAlpha },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    val w = cardWidth.floatValue
-                    // Drags are measured against 1.5 container widths: a card is
-                    // narrower than its container, so one width is not enough travel
-                    // to get a centred card fully off screen.
-                    val travel = w * 1.5f
-                    // -1..0 = pulling the next card in, 0..1 = pulling the previous one.
-                    val pull = (dragX / travel).coerceIn(-1f, 1f)
-                    val forward = pull < 0f
-                    val p = abs(pull)
+            // Geometry of a resting stack: each card below is narrower and sits
+            // lower. 4% per step reads as a real stack; 3% was too subtle to see.
+            val frontFrac = 0.94f
+            val midFrac = 0.90f
+            val lowFrac = 0.86f
+            val midY = with(density) { Space.md.toPx() }
+            val lowY = midY * 2
+            val stackH = with(density) { 160.dp.toPx() }
+            // One card per row, full width, same height as a deck card — the open
+            // state is the same cards laid out as a feed, not a grid of small tiles.
+            val gap = with(density) { Space.md.toPx() }
+            val rowH = stackH
+            val slideIn = with(density) { 26.dp.toPx() }
+            // The deck sits centred in whatever height is left; the list starts at the
+            // very top of the same area.
+            val stackInset = ((areaHeightPx - stackH) / 2f).coerceAtLeast(0f)
 
-                    // Geometry of a resting stack: each card below is narrower and
-                    // sits lower. 4% per step reads as a real stack; 3% was too
-                    // subtle to see at all.
-                    val frontFrac = 0.94f
-                    val midFrac = 0.90f
-                    val lowFrac = 0.86f
-                    val midY = Space.md
-                    val lowY = Space.md * 2
+            fun centered(widthPx: Float) = (w - widthPx) / 2f
 
-                    if (forward) {
-                        // Next card: the card below rises into place while a fresh one
-                        // slides in at the bottom of the stack. No third layer in between.
-                        val incoming = deck.getOrNull((index + 2) % count)
-                        StackCard(
-                            site = incoming,
-                            frac = lowFrac,
-                            x = (1f - p) * travel,
-                            y = lowY,
-                            alpha = 1f,
-                            depth = 2,
-                        )
-                        StackCard(
-                            site = deck.getOrNull((index + 1) % count),
-                            frac = androidx.compose.ui.util.lerp(frontFrac, midFrac, p),
-                            x = 0f,
-                            y = androidx.compose.ui.unit.lerp(0.dp, midY, p),
-                            alpha = androidx.compose.ui.util.lerp(1f, 0.95f, p),
-                            depth = 1,
-                        )
-                        val frontModifier = Modifier
-                            .fillMaxWidth(frontFrac)
-                            .height(160.dp)
-                            .graphicsLayer { translationX = dragX }
-                        if (front == null) {
-                            AddCard(frontModifier, onClick = { adding = true })
-                        } else {
-                            CardFace(
-                                site = front,
-                                modifier = frontModifier.pointerInput(front.url) {
-                                    detectTapGestures(
-                                        onTap = { onOpen(front.url) },
-                                        onLongPress = { editing = front },
-                                    )
-                                },
-                            )
-                        }
-                    } else {
-                        // Previous card: the bottom card slides away to the right,
-                        // and the previous site drops in over the untouched front.
-                        StackCard(
-                            site = deck.getOrNull((index + 2) % count),
-                            frac = lowFrac,
-                            x = p * w,
-                            y = lowY,
-                            alpha = if (p > 0.85f) ((1f - p) / 0.15f) else 1f,
-                            depth = 2,
-                        )
-                        StackCard(
-                            site = deck.getOrNull((index + 1) % count),
-                            frac = midFrac,
-                            x = 0f,
-                            y = midY,
-                            alpha = 0.95f,
-                            depth = 1,
-                        )
-                        val frontModifier = Modifier
-                            .fillMaxWidth(frontFrac)
-                            .height(160.dp)
-                        if (front == null) {
-                            AddCard(frontModifier, onClick = { adding = true })
-                        } else {
-                            CardFace(
-                                site = front,
-                                modifier = frontModifier.pointerInput(front.url) {
-                                    detectTapGestures(
-                                        onTap = { onOpen(front.url) },
-                                        onLongPress = { editing = front },
-                                    )
-                                },
-                            )
-                        }
-                        // Only drawn while the previous card is actually coming in;
-                        // at rest it sits a full travel away and must not paint at all.
-                        if (p > 0.001f) {
-                            val incoming = deck.getOrNull((index - 1 + count) % count)
-                            StackCard(
-                                site = incoming,
-                                frac = frontFrac,
-                                x = -(1f - p) * travel,
-                                y = 0.dp,
-                                alpha = 1f,
-                                depth = 0,
-                            )
-                        }
-                    }
-                }
+            val pitch = rowH + gap
+            // While unfolding, the list is offset by hand so the card on top of the
+            // deck stays under the thumb; once open the drag offset takes over.
+            val scrollPx = if (listMode) listOffset else unfold * index * pitchPx
+            LaunchedEffect(listMode, index) {
+                if (listMode) listOffset = (index * pitchPx).coerceAtMost(maxListOffset)
             }
 
-            val gridAlpha = ((unfold - 0.15f) / 0.85f).coerceIn(0f, 1f)
-            if (gridAlpha > 0.02f) {
-                SiteGrid(
-                    sites = sites,
-                    onOpen = onOpen,
-                    onEdit = { editing = it },
-                    onAdd = { adding = true },
-                    modifier = Modifier
-                        .graphicsLayer {
-                            alpha = gridAlpha
-                            translationY = (1f - gridAlpha) * 20.dp.toPx()
-                        },
+            // Cards are drawn with offsets, which do not contribute to layout height,
+            // so the scrollable area needs an explicit spacer to have any range.
+            Spacer(
+                Modifier
+                    .fillMaxWidth()
+                    .height(with(density) { (160.dp + Space.md) * count }),
+            )
+
+            // Left in the deck / entering from a side / list-only.
+            deck.forEachIndexed { i, site ->
+                val offset = ((i - index) % count + count) % count
+                val gridLeft = 0f
+                val gridTop = i * (rowH + gap)
+
+                var frac = 0f
+                var xPx = 0f
+                var yPx = 0f
+                var z = 0f
+                var elev: androidx.compose.ui.unit.Dp = 0.dp
+                var stackAlpha = 1f
+                var inStack = false
+
+                when {
+                    offset == 0 -> {
+                        inStack = true
+                        if (toNext) {
+                            frac = frontFrac
+                            xPx = dragX
+                            z = 3f
+                            elev = Elev.card
+                        } else {
+                            // Sinks into the middle slot while the previous card
+                            // covers it; without this it snapped down on release.
+                            frac = androidx.compose.ui.util.lerp(frontFrac, midFrac, q)
+                            yPx = midY * q
+                            z = 3f
+                            elev = Elev.card
+                        }
+                    }
+
+                    offset == 1 && count > 1 -> {
+                        inStack = true
+                        if (toNext) {
+                            // Rises to take the front slot — the card that "replaces"
+                            // the one being dragged away.
+                            frac = androidx.compose.ui.util.lerp(midFrac, frontFrac, q)
+                            yPx = androidx.compose.ui.util.lerp(midY, 0f, q)
+                            z = 2f
+                            elev = Elev.stackMid
+                        } else {
+                            frac = androidx.compose.ui.util.lerp(midFrac, lowFrac, q)
+                            yPx = androidx.compose.ui.util.lerp(midY, lowY, q)
+                            z = 2f
+                            elev = Elev.stackMid
+                        }
+                    }
+
+                    offset == 2 && count > 2 -> {
+                        inStack = true
+                        if (toNext) {
+                            frac = androidx.compose.ui.util.lerp(lowFrac, midFrac, q)
+                            yPx = androidx.compose.ui.util.lerp(lowY, midY, q)
+                            z = 1f
+                            elev = Elev.stackLow
+                        } else {
+                            frac = lowFrac
+                            xPx = q * travel
+                            yPx = lowY
+                            z = 1f
+                            elev = Elev.stackLow
+                            stackAlpha = if (q > 0.9f) (1f - q) / 0.1f else 1f
+                        }
+                    }
+
+                    // Dragging left: the next-but-two enters at the bottom of the
+                    // stack, so the loop never runs out of cards.
+                    toNext && offset == 3 && count > 3 -> {
+                        inStack = true
+                        frac = lowFrac
+                        xPx = (1f - q) * travel
+                        yPx = lowY
+                        z = 0f
+                        elev = Elev.stackLow
+                    }
+
+                    // Dragging right: the previous card comes in over the front.
+                    !toNext && offset == count - 1 && count > 1 && q > 0.001f -> {
+                        inStack = true
+                        frac = frontFrac
+                        xPx = -(1f - q) * travel
+                        z = 4f
+                        elev = Elev.card
+                    }
+                }
+
+                if (!inStack) {
+                    // Not part of the stack: it only exists once the list opens, and
+                    // slides up from just below its slot as it appears.
+                    val appear = ((t - 0.35f) / 0.65f).coerceIn(0f, 1f)
+                    if (appear <= 0.01f) return@forEachIndexed
+                    DeckCardBox(
+                        site = site,
+                        leftPx = gridLeft,
+                        topPx = gridTop + (1f - appear) * slideIn - scrollPx + gripDrag,
+                        widthPx = w,
+                        heightPx = rowH,
+                        radiusDp = 26f,
+                        labelSp = 26f,
+                        hostSp = 12f,
+                        alpha = appear,
+                        elevation = 0.dp,
+                        z = 0f,
+                        onClick = { if (site == null) adding = true else onOpen(site.url) },
+                        onLongClick = { site?.let { editing = it } },
+                    )
+                    return@forEachIndexed
+                }
+
+                val stackW = frac * w
+                val stackLeft = centered(stackW) + xPx
+                DeckCardBox(
+                    site = site,
+                    leftPx = androidx.compose.ui.util.lerp(stackLeft, gridLeft, tp),
+                    topPx = androidx.compose.ui.util.lerp(stackInset + yPx, gridTop, tp) -
+                        scrollPx + gripDrag,
+                    widthPx = androidx.compose.ui.util.lerp(stackW, w, tp),
+                    heightPx = androidx.compose.ui.util.lerp(stackH, rowH, tp),
+                    radiusDp = 26f,
+                    labelSp = 26f,
+                    hostSp = 12f,
+                    alpha = stackAlpha,
+                    elevation = androidx.compose.ui.unit.lerp(elev, 0.dp, t),
+                    z = androidx.compose.ui.util.lerp(z, 0f, t),
+                    onClick = { if (site == null) adding = true else onOpen(site.url) },
+                    onLongClick = { site?.let { editing = it } },
                 )
             }
-        }
 
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-            // Unfolded: a grab bar that folds the grid back. Deck: page dots.
-            if (unfold >= 0.25f) {
-                // The visual bar is 6dp tall, but the tap target must not be:
-                // wrap it in a 32dp-high box so folding back is not a pixel hunt.
-                Box(
-                    Modifier
-                        .width(96.dp)
-                        .height(32.dp)
-                        .pointerInput(Unit) {
-                            detectTapGestures(
-                                onTap = {
-                                    scope.launch {
-                                        animate(
-                                            unfold,
-                                            0f,
-                                            animationSpec = Motion.unfold,
-                                        ) { v: Float, _: Float -> unfold = v }
-                                    }
-                                },
+            // Grab bar and page dots live inside the card area, over the cards: a
+            // separate row left a strip of background between the last card and the bar.
+            val gripAlpha = (unfold / 0.3f).coerceIn(0f, 1f)
+            val dotsAlpha = (1f - unfold / 0.3f).coerceIn(0f, 1f)
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 6.dp)
+                    .fillMaxWidth()
+                    .height(36.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (dotsAlpha > 0.01f) {
+                    Row(
+                        Modifier.graphicsLayer { alpha = dotsAlpha },
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        repeat(count.coerceAtMost(12)) { i ->
+                            val active = i == index % count
+                            val w by animateDpAsState(
+                                targetValue = if (active) 18.dp else 6.dp,
+                                animationSpec = Motion.settle(),
+                                label = "dot",
                             )
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
+                            Box(
+                                Modifier
+                                    .size(w, 6.dp)
+                                    .clip(CircleShape)
+                                    .background(
+                                        if (active) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outlineVariant,
+                                    ),
+                            )
+                        }
+                    }
+                }
+                if (gripAlpha > 0.01f) {
+                    // 6dp of visible bar, 48dp of tap target.
                     Box(
                         Modifier
-                            .size(40.dp, 6.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.outlineVariant),
-                    )
-                }
-            }
-            if (unfold < 0.25f) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    repeat(count.coerceAtMost(12)) { i ->
-                        val active = i == index % count
-                        val w by animateDpAsState(
-                            targetValue = if (active) 18.dp else 6.dp,
-                            animationSpec = Motion.settle(),
-                            label = "dot",
-                        )
+                            .width(160.dp)
+                            .height(48.dp)
+                            .graphicsLayer { alpha = gripAlpha }
+                            .pointerInput(Unit) {
+                                // The list follows the finger: dragging the bar down moves
+                                // the cards down with it, and letting go either springs
+                                // back or drops the list out of the way.
+                                awaitEachGesture {
+                                    val down = awaitFirstDown(requireUnconsumed = false)
+                                    down.consume()
+                                    folding = false
+                                    var dragged = 0f
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        if (event.changes.none { it.pressed }) break
+                                        val pan = event.calculatePan()
+                                        if (pan.y != 0f) {
+                                            dragged += pan.y
+                                            gripDrag = (gripDrag + pan.y).coerceAtLeast(0f)
+                                        }
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                    when {
+                                        abs(dragged) < 8.dp.toPx() -> foldFromList()
+                                        gripDrag > areaHeightPx * 0.25f -> dropListFromDrag()
+                                        else -> scope.launch {
+                                            animate(
+                                                gripDrag,
+                                                0f,
+                                                animationSpec = Motion.enter,
+                                            ) { v: Float, _: Float -> gripDrag = v }
+                                        }
+                                    }
+                                }
+                            },
+                        contentAlignment = Alignment.Center,
+                    ) {
                         Box(
                             Modifier
-                                .size(w, 6.dp)
+                                .size(44.dp, 6.dp)
                                 .clip(CircleShape)
-                                .background(
-                                    if (active) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.outlineVariant,
-                                ),
+                                .background(MaterialTheme.colorScheme.outlineVariant),
                         )
                     }
                 }
             }
         }
-        Spacer(Modifier.weight(0.45f))
     }
 
     val editTarget = editing
@@ -496,6 +678,7 @@ private fun SearchField(
     value: String,
     onValueChange: (String) -> Unit,
     onSubmit: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val scheme = MaterialTheme.colorScheme
     val interaction = remember { MutableInteractionSource() }
@@ -504,7 +687,7 @@ private fun SearchField(
     val shape = RoundedCornerShape(Radius.pill)
 
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .heightIn(min = 64.dp)
             .clip(shape)
@@ -559,235 +742,86 @@ private fun SearchField(
 }
 
 @Composable
-private fun CardFace(site: QuickSite, modifier: Modifier = Modifier) {
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val base = Color(FaviconColor.containerColor(site.color, dark))
-    val content = Color(FaviconColor.onContainerColor(site.color, dark))
-    val shape = RoundedCornerShape(Radius.lg)
-
-    Box(
-        modifier
-            .shadow(Elev.card, shape, clip = false)
-            .clip(shape)
-            .background(base)
-            .border(1.dp, Color.White.copy(alpha = if (dark) 0.06f else 0.30f), shape)
-            .padding(22.dp),
-    ) {
-        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-            Text(
-                site.label,
-                fontSize = 26.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = content,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                hostOf(site.url),
-                fontSize = 12.sp,
-                color = content.copy(alpha = 0.75f),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-    }
-}
-
-/**
- * One non-interactive card of the stack. Only geometry is animated; the content
- * stays put so the deck reads as physical cards sliding between slots.
- */
-@Composable
-private fun StackCard(
+private fun DeckCardBox(
     site: QuickSite?,
-    frac: Float,
-    x: Float,
-    y: androidx.compose.ui.unit.Dp,
+    leftPx: Float,
+    topPx: Float,
+    widthPx: Float,
+    heightPx: Float,
+    radiusDp: Float,
+    labelSp: Float,
+    hostSp: Float,
     alpha: Float,
-    depth: Int,
-) {
-    if (alpha < 0.02f) return
-    // The trailing "+" slot has no colour of its own; painting it would leak a
-    // grey rectangle out from under the stack.
-    val real = site ?: return
-    val dark = isSystemInDarkTheme()
-    val base = Color(FaviconColor.containerColor(real.color, dark))
-    // Depth is read from light, not from colour alone: a card further back is
-    // darker and casts a smaller shadow than the one in front of it.
-    val shade = when (depth) {
-        2 -> if (dark) 0.24f else 0.12f
-        1 -> if (dark) 0.13f else 0.06f
-        else -> 0f
-    }
-    val shape = RoundedCornerShape(Radius.lg)
-    Box(
-        Modifier
-            .fillMaxWidth(frac)
-            .height(160.dp)
-            .graphicsLayer {
-                translationX = x
-                translationY = y.toPx()
-                this.alpha = alpha
-            }
-            .shadow(
-                elevation = when (depth) {
-                    2 -> Elev.stackLow
-                    1 -> Elev.stackMid
-                    else -> Elev.card
-                },
-                shape = shape,
-                clip = false,
-            )
-            .clip(shape)
-            .background(if (shade > 0f) lerp(base, Color.Black, shade) else base)
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = if (dark) 0.06f else 0.30f),
-                shape = shape,
-            ),
-    )
-}
-
-@Composable
-private fun BackCard(site: QuickSite?, modifier: Modifier = Modifier) {
-    val scheme = MaterialTheme.colorScheme
-    val base = site?.let {
-        val dark = androidx.compose.foundation.isSystemInDarkTheme()
-        Color(FaviconColor.containerColor(it.color, dark))
-    } ?: scheme.surfaceVariant
-    Box(modifier.clip(RoundedCornerShape(26.dp)).background(base))
-}
-
-@Composable
-private fun AddCard(modifier: Modifier = Modifier, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    val shape = RoundedCornerShape(Radius.lg)
-    Box(
-        modifier
-            .clip(shape)
-            .background(scheme.surfaceVariant.copy(alpha = 0.35f))
-            // Dashed, not solid: an empty slot should look like an opening, and a
-            // solid outline reads as a filled card that happens to be pale.
-            .drawWithCache {
-                val stroke = Stroke(
-                    width = 2.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(
-                        floatArrayOf(9.dp.toPx(), 7.dp.toPx()),
-                    ),
-                )
-                val radius = CornerRadius(Radius.lg.toPx())
-                onDrawWithContent {
-                    drawContent()
-                    drawRoundRect(
-                        color = scheme.outlineVariant,
-                        cornerRadius = radius,
-                        style = stroke,
-                    )
-                }
-            }
-            .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.Default.Add,
-            contentDescription = "添加快捷方式",
-            tint = scheme.onSurfaceVariant,
-            modifier = Modifier.size(30.dp),
-        )
-    }
-}
-
-@Composable
-private fun SiteGrid(
-    sites: List<QuickSite>,
-    onOpen: (String) -> Unit,
-    onEdit: (QuickSite) -> Unit,
-    onAdd: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val cells: List<QuickSite?> = sites + listOf(null)
-    Column(
-        modifier
-            .fillMaxWidth()
-            .then(
-                // Only scroll when the grid cannot fit; a scrollable grid would
-                // swallow the upward drag that folds it back into the deck.
-                if (cells.size > 9) Modifier.verticalScroll(rememberScrollState()) else Modifier,
-            ),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        cells.chunked(3).forEach { row ->
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                row.forEach { site ->
-                    if (site == null) {
-                        AddCell(Modifier.weight(1f), onAdd)
-                    } else {
-                        GridCell(
-                            site = site,
-                            modifier = Modifier.weight(1f),
-                            onClick = { onOpen(site.url) },
-                            onLongClick = { onEdit(site) },
-                        )
-                    }
-                }
-                repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GridCell(
-    site: QuickSite,
-    modifier: Modifier,
+    elevation: androidx.compose.ui.unit.Dp,
+    z: Float,
     onClick: () -> Unit,
     onLongClick: () -> Unit,
 ) {
-    val dark = androidx.compose.foundation.isSystemInDarkTheme()
-    val base = Color(FaviconColor.containerColor(site.color, dark))
-    val content = Color(FaviconColor.onContainerColor(site.color, dark))
+    if (alpha < 0.02f || widthPx < 2f || heightPx < 2f) return
+    val density = LocalDensity.current
+    val dark = isSystemInDarkTheme()
+    val scheme = MaterialTheme.colorScheme
+    // The "+" slot keeps its place in the stack: leaving it out made the deck read
+    // as losing a card mid-swipe.
+    val base = site?.let { Color(FaviconColor.containerColor(it.color, dark)) }
+        ?: scheme.surfaceVariant.copy(alpha = 0.55f)
+    val content = site?.let { Color(FaviconColor.onContainerColor(it.color, dark)) }
+        ?: scheme.onSurfaceVariant
+    val shape = RoundedCornerShape(radiusDp.dp)
     Box(
-        modifier
-            .height(64.dp)
-            .clip(RoundedCornerShape(Radius.md))
+        Modifier
+            .offset { IntOffset(leftPx.roundToInt(), topPx.roundToInt()) }
+            .size(with(density) { widthPx.toDp() }, with(density) { heightPx.toDp() })
+            .zIndex(z)
+            .graphicsLayer { this.alpha = alpha }
+            .shadow(elevation, shape, clip = false)
+            .clip(shape)
             .background(base)
-            .pointerInput(site.url) {
+            .border(1.dp, Color.White.copy(alpha = if (dark) 0.06f else 0.30f), shape)
+            .pointerInput(site?.url) {
                 detectTapGestures(onTap = { onClick() }, onLongPress = { onLongClick() })
             }
-            .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart,
+            .padding(horizontal = 14.dp, vertical = 10.dp),
     ) {
-        Text(
-            site.label,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium,
-            color = content,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-        )
-    }
-}
-
-@Composable
-private fun AddCell(modifier: Modifier, onClick: () -> Unit) {
-    val scheme = MaterialTheme.colorScheme
-    Box(
-        modifier
-            .height(64.dp)
-            .clip(RoundedCornerShape(Radius.md))
-            .background(scheme.surfaceVariant.copy(alpha = 0.5f))
-            .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            Icons.Default.Add,
-            contentDescription = "添加快捷方式",
-            tint = scheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
+        if (site == null) {
+            Icon(
+                Icons.Default.Add,
+                contentDescription = "添加快捷方式",
+                tint = content,
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .size(26.dp),
+            )
+        } else {
+            Column(
+                Modifier
+                    .align(Alignment.CenterStart)
+                    .fillMaxSize(),
+                verticalArrangement = if (labelSp > 18f) {
+                    Arrangement.SpaceBetween
+                } else {
+                    Arrangement.Center
+                },
+            ) {
+                Text(
+                    site.label,
+                    fontSize = labelSp.sp,
+                    fontWeight = if (labelSp > 18f) FontWeight.SemiBold else FontWeight.Medium,
+                    color = content,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (hostSp > 2f) {
+                    Text(
+                        hostOf(site.url),
+                        fontSize = hostSp.sp,
+                        color = content.copy(alpha = 0.75f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        }
     }
 }
 

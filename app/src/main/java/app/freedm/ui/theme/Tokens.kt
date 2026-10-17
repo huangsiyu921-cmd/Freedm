@@ -52,6 +52,6 @@ object Motion {
     /** Snapping back when a drag does not pass the threshold. */
     fun <T> settle(): SpringSpec<T> = spring(dampingRatio = 0.75f, stiffness = 700f)
 
-    /** Unfolding the deck into the grid. */
-    val unfold = tween<Float>(280, easing = FastOutSlowInEasing)
+    /** Unfolding the deck into the list (and folding it back). */
+    val unfold = tween<Float>(420, easing = FastOutSlowInEasing)
 }
