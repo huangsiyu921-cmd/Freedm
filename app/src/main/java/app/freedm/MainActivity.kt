@@ -56,8 +56,10 @@ import app.freedm.ui.screens.BrowseScreen
 import app.freedm.ui.screens.DownloadsScreen
 import app.freedm.ui.screens.PrivacyScreen
 import app.freedm.ui.screens.SettingsScreen
+import app.freedm.ui.screens.SiteDataScreen
 import app.freedm.ui.screens.TaskDetailScreen
 import app.freedm.ui.theme.FreeDmTheme
+import app.freedm.ui.theme.START_TAB
 import app.freedm.ui.theme.THEME_DYNAMIC
 import app.freedm.ui.theme.THEME_MODE
 import app.freedm.ui.theme.isDarkTheme
@@ -167,9 +169,19 @@ private enum class Tab(val label: String, val icon: ImageVector) {
 
 @Composable
 private fun AppRoot(scope: CoroutineScope) {
-    var tab by remember { mutableStateOf(Tab.DOWNLOADS) }
+    val startTab = remember { Repo.prefs().getString(START_TAB, "downloads") ?: "downloads" }
+    var tab by remember {
+        mutableStateOf(
+            when (startTab) {
+                "browse" -> Tab.BROWSE
+                "settings" -> Tab.SETTINGS
+                else -> Tab.DOWNLOADS
+            },
+        )
+    }
     var detailId by remember { mutableStateOf<Long?>(null) }
     var showPrivacy by remember { mutableStateOf(false) }
+    var showSiteData by remember { mutableStateOf(false) }
 
     // A link shared in from another app (or the clipboard watcher) must land on
     // the download tab, otherwise the sheet never composes and the link is lost.
@@ -187,7 +199,12 @@ private fun AppRoot(scope: CoroutineScope) {
     BackHandler(enabled = tab != Tab.DOWNLOADS) { tab = Tab.DOWNLOADS }
     BackHandler(enabled = detailId != null) { detailId = null }
     BackHandler(enabled = showPrivacy) { showPrivacy = false }
+    BackHandler(enabled = showSiteData) { showSiteData = false }
 
+    if (showSiteData) {
+        SiteDataScreen(onBack = { showSiteData = false })
+        return
+    }
     if (showPrivacy) {
         PrivacyScreen(onBack = { showPrivacy = false })
         return
@@ -208,7 +225,10 @@ private fun AppRoot(scope: CoroutineScope) {
             when (tab) {
                 Tab.DOWNLOADS -> DownloadsScreen(scope = scope, onOpenDetail = { detailId = it })
                 Tab.BROWSE -> BrowseScreen()
-                Tab.SETTINGS -> SettingsScreen(onOpenPrivacy = { showPrivacy = true })
+                Tab.SETTINGS -> SettingsScreen(
+                    onOpenPrivacy = { showPrivacy = true },
+                    onOpenSiteData = { showSiteData = true },
+                )
             }
         }
     }

@@ -40,6 +40,9 @@ private val Dark = darkColorScheme(
 const val THEME_MODE = "theme_mode"
 const val THEME_DYNAMIC = "dynamic_color"
 
+/** Which tab the app opens on: "downloads" | "browse" | "settings". */
+const val START_TAB = "start_tab"
+
 /**
  * @param mode "system" | "light" | "dark"
  * @param dynamicColor Material You palette taken from the wallpaper (Android 12+)

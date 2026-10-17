@@ -1,6 +1,7 @@
 package app.freedm.ui.screens
 
 import android.net.Uri
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateDpAsState
@@ -139,7 +140,8 @@ fun StartPage(
             animate(
                 dragX,
                 -direction * w,
-                animationSpec = tween(170, easing = FastOutSlowInEasing),
+                // Material's emphasized-decelerate: starts brisk, lands softly.
+                animationSpec = tween(260, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)),
             ) { v: Float, _: Float -> dragX = v }
             index = ((index + direction) % count + count) % count
             // The neighbour card has already travelled to the centre, so reset
@@ -200,7 +202,7 @@ fun StartPage(
                                 dragX += pan.x
                                 event.changes.forEach { it.consume() }
                             } else if (axis == 2) {
-                                unfold = (unfold - pan.y / 320f).coerceIn(0f, 1f)
+                                unfold = (unfold - pan.y / 900f).coerceIn(0f, 1f)
                                 event.changes.forEach { it.consume() }
                             }
                         }
@@ -255,8 +257,10 @@ fun StartPage(
                     }
 
                     // The neighbour rides in from the far side while the front
-                    // card leaves, so a flip has no gap in the middle.
-                    if (abs(dragX) > 2f) {
+                    // card leaves — but only once the drag is deliberate, and it
+                    // fades in so it never pops up beside the card.
+                    val nbAlpha = (abs(dragX) / (cardWidth.floatValue * 0.3f)).coerceIn(0f, 1f)
+                    if (nbAlpha > 0.02f) {
                         val nbIndex = if (dragX < 0f) (index + 1) % count else (index - 1 + count) % count
                         val nb = deck.getOrNull(nbIndex)
                         val w = cardWidth.floatValue
@@ -264,7 +268,10 @@ fun StartPage(
                         val nbModifier = Modifier
                             .fillMaxWidth(0.93f)
                             .height(160.dp)
-                            .graphicsLayer { translationX = offset }
+                            .graphicsLayer {
+                                translationX = offset
+                                alpha = nbAlpha
+                            }
                         if (nb == null) {
                             BackCard(site = null, modifier = nbModifier)
                         } else {

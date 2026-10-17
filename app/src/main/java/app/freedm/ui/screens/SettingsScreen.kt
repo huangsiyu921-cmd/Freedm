@@ -33,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.freedm.data.Repo
 import app.freedm.engine.Engine
+import app.freedm.ui.theme.START_TAB
 import app.freedm.ui.theme.THEME_DYNAMIC
 import app.freedm.ui.theme.THEME_MODE
 import app.freedm.ui.formatBytes
@@ -49,7 +50,7 @@ private fun bpsToPos(bps: Long): Float =
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(onOpenPrivacy: () -> Unit) {
+fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
     val prefs = remember { Repo.prefs() }
     var maxConcurrent by remember { mutableStateOf(prefs.getInt("max_concurrent", 3).toFloat()) }
     var threads by remember { mutableStateOf(prefs.getInt("threads", 8).toFloat()) }
@@ -63,6 +64,7 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
     var clipWatch by remember { mutableStateOf(prefs.getBoolean("clipboard_watch", false)) }
     var themeMode by remember { mutableStateOf(prefs.getString(THEME_MODE, "system") ?: "system") }
     var dynamicColor by remember { mutableStateOf(prefs.getBoolean(THEME_DYNAMIC, false)) }
+    var startTab by remember { mutableStateOf(prefs.getString(START_TAB, "downloads") ?: "downloads") }
     val ctx = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(topBar = { TopAppBar(title = { Text("设置") }) }) { pad ->
@@ -101,6 +103,29 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
                         }
                     },
                 )
+            }
+            item {
+                Text(
+                    "启动页",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.padding(start = 20.dp, top = 16.dp, bottom = 2.dp),
+                )
+            }
+            item {
+                Column {
+                    ThemeRow("下载", startTab == "downloads") {
+                        startTab = "downloads"
+                        prefs.edit().putString(START_TAB, "downloads").apply()
+                    }
+                    ThemeRow("浏览", startTab == "browse") {
+                        startTab = "browse"
+                        prefs.edit().putString(START_TAB, "browse").apply()
+                    }
+                    ThemeRow("设置", startTab == "settings") {
+                        startTab = "settings"
+                        prefs.edit().putString(START_TAB, "settings").apply()
+                    }
+                }
             }
 
             item { GroupTitle("下载") }
@@ -301,25 +326,15 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
                 Row(
                     Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            runCatching {
-                                android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                                android.webkit.CookieManager.getInstance().flush()
-                                android.webkit.WebStorage.getInstance().deleteAllData()
-                                prefs.edit().remove("last_page").apply()
-                            }
-                            android.widget.Toast.makeText(
-                                ctx, "已清除", android.widget.Toast.LENGTH_SHORT,
-                            ).show()
-                        }
+                        .clickable { onOpenSiteData() }
                         .padding(horizontal = 20.dp, vertical = 16.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("清除浏览数据", style = MaterialTheme.typography.bodyLarge)
+                        Text("管理网站 Cookies", style = MaterialTheme.typography.bodyLarge)
                         Spacer(Modifier.height(2.dp))
                         Text(
-                            "Cookie、本地存储、上次页面",
+                            "按站点查看与清除",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

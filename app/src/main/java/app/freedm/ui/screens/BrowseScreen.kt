@@ -50,11 +50,13 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -70,6 +72,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -112,6 +115,9 @@ private fun looksLikeDownload(url: String): Boolean {
     return ext.isNotEmpty() && ext in DOWNLOAD_EXT
 }
 
+/** One browser tab: only the address and title are kept. */
+private data class TabEntry(val url: String, val title: String)
+
 private const val UA_DESKTOP =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -138,6 +144,10 @@ fun BrowseScreen() {
     var showStart by remember { mutableStateOf(true) }
 
     var menuOpen by remember { mutableStateOf(false) }
+    // Tabs keep only the URL/title; the single WebView reloads on switch.
+    val tabs = remember { mutableStateListOf(TabEntry("", "")) }
+    var activeTab by remember { mutableIntStateOf(0) }
+    var showTabs by remember { mutableStateOf(false) }
     var findOpen by remember { mutableStateOf(false) }
     var findQuery by remember { mutableStateOf("") }
     var sourceText by remember { mutableStateOf<String?>(null) }
@@ -265,6 +275,24 @@ fun BrowseScreen() {
                 .padding(horizontal = 4.dp, vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Tabs live at the far left; the count doubles as the entry point.
+            IconButton(onClick = { showTabs = true }, modifier = Modifier.size(40.dp)) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Menu,
+                        contentDescription = "标签页",
+                        modifier = Modifier.size(20.dp),
+                    )
+                    Text(
+                        "${tabs.size}",
+                        fontSize = 9.sp,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(end = 2.dp, bottom = 2.dp),
+                    )
+                }
+            }
             if (canGoBack) {
                 IconButton(onClick = { webView?.goBack() }, modifier = Modifier.size(40.dp)) {
                     Icon(
@@ -286,7 +314,7 @@ fun BrowseScreen() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Box(Modifier.weight(1f)) {
-                    if (showStart) {
+                    if (address.isEmpty()) {
                         Text(
                             "搜索或输入网址",
                             fontSize = 13.sp,
@@ -294,7 +322,7 @@ fun BrowseScreen() {
                         )
                     }
                     BasicTextField(
-                        value = if (showStart) "" else address,
+                        value = address,
                         onValueChange = { address = it },
                         singleLine = true,
                         textStyle = TextStyle(
@@ -470,7 +498,19 @@ fun BrowseScreen() {
         }
 
         if (loading > 0f && loading < 1f) {
-            LinearProgressIndicator(progress = { loading }, modifier = Modifier.fillMaxWidth())
+            // Small spinner under the address bar: a thin bar was too easy to miss.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 4.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(22.dp),
+                    strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
 
         Box(
@@ -533,9 +573,16 @@ fun BrowseScreen() {
                             }
 
                             override fun onPageFinished(v: WebView?, url: String?) {
+                                loading = 1f
                                 canGoBack = v?.canGoBack() ?: false
                                 canGoForward = v?.canGoForward() ?: false
                                 if (url != null && url != "about:blank") {
+                                    if (activeTab in tabs.indices) {
+                                        tabs[activeTab] = TabEntry(
+                                            url = url,
+                                            title = v?.title?.takeIf { it.isNotBlank() } ?: url,
+                                        )
+                                    }
                                     if (prefs.getBoolean("remember_page", false)) {
                                         prefs.edit().putString("last_page", url).apply()
                                     }
@@ -673,6 +720,82 @@ fun BrowseScreen() {
                 TextButton(onClick = { historyOpen = false }) { Text("关闭") }
             },
         )
+    }
+
+    if (showTabs) {
+        ModalBottomSheet(onDismissRequest = { showTabs = false }) {
+            Column(Modifier.padding(horizontal = 16.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("标签页 ${tabs.size}", style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = {
+                        tabs.add(TabEntry("", ""))
+                        activeTab = tabs.lastIndex
+                        showTabs = false
+                        showStart = true
+                        address = ""
+                        webView?.loadUrl("about:blank")
+                    }) { Text("新建") }
+                }
+                HorizontalDivider()
+                tabs.forEachIndexed { i, tab ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                showTabs = false
+                                activeTab = i
+                                if (tab.url.isBlank()) {
+                                    showStart = true
+                                    address = ""
+                                    webView?.loadUrl("about:blank")
+                                } else {
+                                    showStart = false
+                                    address = tab.url
+                                    webView?.loadUrl(tab.url)
+                                }
+                            }
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                tab.title.ifBlank { "新标签页" },
+                                style = MaterialTheme.typography.bodyMedium,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = if (i == activeTab) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                            )
+                            if (tab.url.isNotBlank()) {
+                                Text(
+                                    tab.url,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                        if (tabs.size > 1) {
+                            IconButton(onClick = {
+                                tabs.removeAt(i)
+                                if (activeTab > i || activeTab >= tabs.size) {
+                                    activeTab = (activeTab - 1).coerceAtLeast(0)
+                                }
+                            }) {
+                                Icon(Icons.Default.Close, contentDescription = "关闭标签")
+                            }
+                        }
+                    }
+                    HorizontalDivider()
+                }
+                Spacer(Modifier.height(20.dp))
+            }
+        }
     }
 
     if (showMedia) {
