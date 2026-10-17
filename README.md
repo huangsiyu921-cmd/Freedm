@@ -33,7 +33,7 @@
 - **起始页**：快捷方式卡片堆，上滑展开成单列信息流，按信息流方向滚动；
   回到卡片堆有两条手势 —— 划到最上面再往下拉、按住底部横杠往上推；
   卡片颜色可从预设里挑，也可以选「自动」跟随站点图标
-- **分享接收**：`ACTION_SEND` / `ACTION_VIEW` 直接建任务
+- **分享接收**：`ACTION_SEND` 进来的一律建任务；在其他应用点开的链接按默认浏览器打开网页，只有能看出是文件的（apk/zip/mp4…）或 WebView 自己渲染不了的才自动进下载队列
 - **剪贴板识别**：默认关闭，仅前台生效，不保存原文
 - **导出**：可选复制到系统 Downloads（MediaStore）
 - **诊断日志**：`Android/data/<包名>/files/logs/diag.log`，只记域名与错误码，设置页可关可清空
@@ -49,7 +49,7 @@
 也可以在 Android Studio 里直接 Sync + Build，release 用 `Generate Signed APK` 选自己的 keystore。
 
 - **applicationId**：`com.huangsy.freedm`（Java 包名仍为 `app.freedm`）
-- **版本**：0.1.3（versionCode 4）
+- **版本**：0.1.4（versionCode 5）
 - **工具链**：AGP 8.5.2 / Kotlin 2.1.20 / Compose BOM 2024.10.01 / Gradle 8.7 / JDK 17
 - **可复现性**：wrapper 与依赖版本全部写死（无动态版本号），同工具链下行为一致；APK 本身是非字节级可复现（含时间戳与签名）。首次构建需联网拉依赖，之后 `--offline` 可用。
 

@@ -99,6 +99,7 @@ import app.freedm.data.Repo
 import app.freedm.diag.Diag
 import app.freedm.engine.Engine
 import app.freedm.engine.FileNamer
+import app.freedm.engine.looksLikeDownload
 import app.freedm.engine.Prober
 import app.freedm.service.DownloadService
 import app.freedm.ui.BrowserBus
@@ -112,20 +113,6 @@ import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-
-/** Extensions that should become a download task instead of a page load. */
-private val DOWNLOAD_EXT = setOf(
-    "apk", "zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso", "img", "exe", "msi",
-    "dmg", "pkg", "deb", "rpm", "torrent",
-    "mp4", "mkv", "avi", "mov", "webm", "flv", "mp3", "flac", "wav", "m4a", "ogg",
-    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "epub",
-)
-
-private fun looksLikeDownload(url: String): Boolean {
-    val name = url.substringBefore('?').substringBefore('#').substringAfterLast('/')
-    val ext = name.substringAfterLast('.', "").lowercase()
-    return ext.isNotEmpty() && ext in DOWNLOAD_EXT
-}
 
 /**
  * Only real pages are restorable.
@@ -788,6 +775,17 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                             settings.isAlgorithmicDarkeningAllowed = darkUi
                         }
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
+
+                        // Reached only when the WebView cannot render the target itself
+                        // — `Content-Disposition: attachment`, or a type it has no
+                        // viewer for. That is exactly "this link is a file", so the
+                        // extension heuristic never has to guess.
+                        setDownloadListener { dlUrl, _, _, mime, _ ->
+                            if (dlUrl != null && dlUrl.startsWith("http")) {
+                                Diag.log("DL_LISTENER", "host=${Diag.hostOf(dlUrl)} mime=$mime")
+                                startDownload(dlUrl)
+                            }
+                        }
 
                         // Restore the active tab first; the older "remember page"
                         // switch stays as a fallback when no tab URL was saved.

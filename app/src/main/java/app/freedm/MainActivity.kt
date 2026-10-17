@@ -59,6 +59,8 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import app.freedm.data.Repo
+import app.freedm.engine.looksLikeDownload
+import app.freedm.ui.BrowserBus
 import app.freedm.ui.ShareBus
 import app.freedm.ui.firstUrl
 import app.freedm.ui.screens.BrowseScreen
@@ -189,15 +191,27 @@ class MainActivity : ComponentActivity() {
             .show()
     }
 
-    /** Picks up a shared link without storing anything about the sender. */
+    /** Picks up a shared or externally opened link without storing anything about the sender. */
     private fun consumeIntent(intent: Intent?) {
         if (intent == null) return
-        val raw = when (intent.action) {
-            Intent.ACTION_SEND -> intent.getStringExtra(Intent.EXTRA_TEXT)
-            Intent.ACTION_VIEW -> intent.dataString
-            else -> null
-        }
-        firstUrl(raw)?.let { ShareBus.post(it) }
+        // Chat apps hand links over in several shapes: ACTION_VIEW with data,
+        // ACTION_SEND with EXTRA_TEXT, sometimes both, sometimes the text holds a
+        // title wrapped around the URL. Take whatever is there instead of trusting
+        // the action to say which field it used.
+        val raw = intent.dataString?.takeIf { it.isNotBlank() }
+            ?: intent.getStringExtra(Intent.EXTRA_TEXT)
+        val url = firstUrl(raw) ?: return
+
+        // Two destinations, and the difference matters: this app is the default
+        // browser, so a link tapped elsewhere is normally a page to read. Only a
+        // shared link (someone sent it to us → "save this") or an unmistakable file
+        // goes to the queue.
+        val toDownload = intent.action == Intent.ACTION_SEND || looksLikeDownload(url)
+        app.freedm.diag.Diag.log(
+            "INTENT",
+            "action=${intent.action} download=$toDownload picked=${url.take(48)}",
+        )
+        if (toDownload) ShareBus.post(url) else BrowserBus.post(url)
     }
 
     private val clipboardWatcher by lazy {
@@ -252,6 +266,18 @@ private fun AppRoot(scope: CoroutineScope) {
             showPrivacy = false
             detailId = null
             tab = Tab.DOWNLOADS
+        }
+    }
+
+    // A page opened from another app (this app is the default browser) belongs in
+    // the browser tab — DownloadsScreen would put up a "new download" sheet for it.
+    val openPage by BrowserBus.open.collectAsState()
+    LaunchedEffect(openPage) {
+        if (openPage != null) {
+            showPrivacy = false
+            detailId = null
+            showHistory = false
+            tab = Tab.BROWSE
         }
     }
 
