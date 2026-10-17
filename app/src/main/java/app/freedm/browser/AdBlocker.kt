@@ -1,9 +1,11 @@
 package app.freedm.browser
 
 import android.content.Context
+import android.net.Uri
 import android.webkit.WebResourceResponse
 import app.freedm.data.Repo
 import java.io.ByteArrayInputStream
+import java.io.File
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -22,10 +24,13 @@ import java.util.concurrent.atomic.AtomicLong
 object AdBlocker {
 
     private const val ASSET = "adblock_hosts.txt"
+    private const val USER_FILE = "adblock_user.txt"
     const val PREF_ENABLED = "adblock"
     const val PREF_ALLOW = "adblock_allow"
 
     private val rules = HashSet<String>(1024)
+    /** Rules the user imported from a local file; kept separate so a re-import is replaceable. */
+    private val userRules = HashSet<String>(256)
     private val blocked = AtomicLong(0)
     private val emptyBody = ByteArray(0)
 
@@ -45,6 +50,15 @@ object AdBlocker {
                     lines.forEach { raw ->
                         val line = raw.substringBefore('#').trim().lowercase()
                         if (line.isNotEmpty()) rules.add(line)
+                    }
+                }
+            }
+            // User-imported rules live in app storage and survive restarts.
+            runCatching {
+                val f = File(context.applicationContext.filesDir, USER_FILE)
+                if (f.isFile) {
+                    f.bufferedReader().useLines { lines ->
+                        lines.forEach { raw -> parseRuleLine(raw)?.let { userRules.add(it) } }
                     }
                 }
             }
@@ -129,11 +143,82 @@ object AdBlocker {
         if (!loaded) return false
         var h = host
         while (true) {
-            if (h in rules) return true
+            if (h in rules || h in userRules) return true
             val dot = h.indexOf('.')
             if (dot < 0) return false
             h = h.substring(dot + 1)
         }
+    }
+
+    // ---------------------------------------------------------------- 用户导入
+
+    /**
+     * Imports a user-supplied block list from [uri].
+     *
+     * Accepted per line: a bare host (`ads.example.com`), a hosts-file entry
+     * (`0.0.0.0 ads.example.com`), or a comment (`#…`). Anything else — paths,
+     * regexes, `||`/`^` anchors, `##` cosmetic rules — is **ignored on purpose**:
+     * this blocker only ever matches on host names, so no imported line can
+     * silently swallow a download link.
+     *
+     * @return number of distinct hosts accepted.
+     */
+    fun importFrom(context: Context, uri: Uri): Int {
+        ensureLoaded(context)
+        val parsed = LinkedHashSet<String>()
+        runCatching {
+            context.contentResolver.openInputStream(uri)?.bufferedReader()?.useLines { lines ->
+                lines.forEach { raw -> parseRuleLine(raw)?.let { parsed.add(it) } }
+            }
+        }.onFailure { return 0 }
+        if (parsed.isEmpty()) return 0
+
+        runCatching {
+            File(context.applicationContext.filesDir, USER_FILE).bufferedWriter().use { w ->
+                w.write("# user rules\n")
+                parsed.forEach {
+                    w.write(it)
+                    w.newLine()
+                }
+            }
+        }
+        synchronized(this) {
+            userRules.clear()
+            userRules.addAll(parsed)
+        }
+        return parsed.size
+    }
+
+    fun clearUserRules(context: Context): Int {
+        val removed = synchronized(this) {
+            val n = userRules.size
+            userRules.clear()
+            n
+        }
+        runCatching { File(context.applicationContext.filesDir, USER_FILE).delete() }
+        return removed
+    }
+
+    fun userRuleCount(): Int = synchronized(this) { userRules.size }
+
+    /** One host per line, or a hosts-file line; returns null for anything unsupported. */
+    internal fun parseRuleLine(raw: String): String? {
+        val line = raw.substringBefore('#').trim()
+        if (line.isEmpty()) return null
+        val parts = line.split(' ', '\t').filter { it.isNotEmpty() }
+        val candidate = when {
+            parts.size >= 2 && parts[0].firstOrNull()?.isDigit() == true -> parts[1]
+            parts.size == 1 -> parts[0]
+            else -> return null
+        }
+        val host = candidate
+            .lowercase()
+            .removePrefix("*.")
+            .removePrefix(".")
+            .trimEnd('.')
+        if (host.isEmpty() || !host.contains('.')) return null
+        if (host.any { it == '/' || it == '^' || it == '|' }) return null
+        return host
     }
 
     private fun allowSet(): Set<String> {

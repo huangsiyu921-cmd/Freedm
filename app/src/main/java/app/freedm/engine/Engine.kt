@@ -8,6 +8,7 @@ import app.freedm.data.ProbeResult
 import app.freedm.data.Repo
 import app.freedm.data.Segment
 import app.freedm.data.TaskState
+import app.freedm.diag.Diag
 import app.freedm.service.Notifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -93,6 +94,7 @@ object Engine {
                 // Deleting a task cancels it too; it must not resurface as failed.
                 if (Repo.task(id) == null) return@launch
                 val msg = t.message ?: t::class.java.simpleName
+                Diag.log("TASK_FAIL", "id=$id ${t::class.java.simpleName}: $msg")
                 Repo.setState(id, TaskState.FAILED, msg)
                 Notifier.failed(Repo.context, id, Repo.task(id)?.fileName ?: "下载任务", msg)
             } finally {
@@ -196,6 +198,11 @@ object Engine {
             )
             Repo.update(task)
         }
+        Diag.log(
+            "TASK_START",
+            "id=$id bytes=${task.totalBytes} seg=${task.segmented} " +
+                "host=${Diag.hostOf(task.finalUrl ?: task.url).orEmpty()}",
+        )
 
         // 2) A changed validator invalidates everything already on disk.
         val existing = Repo.loadSegments(id)
@@ -227,6 +234,7 @@ object Engine {
         val plan = Repo.loadSegments(id)
 
         if (task.wifiOnly && !onWifi()) {
+            Diag.log("TASK_WIFI_WAIT", "id=$id")
             Repo.setState(id, TaskState.PAUSED, WIFI_WAIT)
             return
         }
@@ -312,6 +320,7 @@ object Engine {
                 error("文件大小不符：${file.length()} / $total")
             }
             Repo.setState(id, TaskState.COMPLETED)
+            Diag.log("TASK_DONE", "id=$id bytes=$finalBytes")
             Notifier.completed(Repo.context, id, task.fileName, file.absolutePath)
             Exporter.exportIfEnabled(Repo.context, file, task.fileName)
         } finally {
@@ -410,6 +419,11 @@ object Engine {
                 if (e is InterruptedIOException || Thread.currentThread().isInterrupted) {
                     throw CancellationException("paused")
                 }
+                Diag.log(
+                    "SEG_RETRY",
+                    "id=$taskId seg=${seg.index} attempt=$attempt " +
+                        "${e::class.java.simpleName}: ${e.message}",
+                )
                 if (attempt >= MAX_RETRY) return false
                 // Exponential backoff: 1s, 2s, 4s.
                 Thread.sleep(1000L shl (attempt - 1))

@@ -163,6 +163,23 @@ adb shell run-as com.huangsy.freedm.dev cat shared_prefs/settings.xml   # 看 ad
 
 规则与匹配逻辑见 `docs/logic-spec.md` §19；名单文件 `app/src/main/assets/adblock_hosts.txt`。
 
+### B5 诊断日志 — `PASS`
+
+```powershell
+adb shell am start -n com.huangsy.freedm.dev/app.freedm.MainActivity
+# 浏览 tab → 打开任意页面（含视频的测试页：www.runoob.com/html/html5-video.html）
+adb shell cat /storage/emulated/0/Android/data/com.huangsy.freedm.dev/files/logs/diag.log
+```
+
+判定：
+1. 文件存在，每行形如 `10-17 21:42:01.209  PAGE_DONE  host=… ms=… sniffed=… net=… blocked=…`。
+2. 至少出现 `APP_START`、`NET_TRANSPORT`、`PAGE_START`、`PAGE_DONE`、`SNIFF_DOM`。
+3. 含 `<video>` 的页面应出现 `sniffed>0` 与 `SNIFF_DOM parsed>0`（实测菜鸟教程页：`sniffed=2 net=4 parsed=2`）。
+4. 百度首页不应再出现 `PAGE_START utils` / `ERR_UNKNOWN_URL_SCHEME`（deeplink 已被拦）；出现 `NAV_BLOCKED` 属正常。
+5. 设置页「诊断」显示路径与大小，点「清空诊断日志」后文件消失。
+
+事件表与取日志方法见 `docs/logic-spec.md` §20。
+
 ---
 
 ## C. 隐私基线

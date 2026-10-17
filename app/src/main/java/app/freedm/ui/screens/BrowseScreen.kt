@@ -94,6 +94,7 @@ import app.freedm.browser.AdBlocker
 import app.freedm.browser.SniffedMedia
 import app.freedm.browser.Sniffer
 import app.freedm.data.Repo
+import app.freedm.diag.Diag
 import app.freedm.engine.Engine
 import app.freedm.engine.FileNamer
 import app.freedm.engine.Prober
@@ -106,6 +107,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /** Extensions that should become a download task instead of a page load. */
@@ -121,6 +123,16 @@ private fun looksLikeDownload(url: String): Boolean {
     val ext = name.substringAfterLast('.', "").lowercase()
     return ext.isNotEmpty() && ext in DOWNLOAD_EXT
 }
+
+/**
+ * Only real pages are restorable.
+ *
+ * Domestic sites hand out deeplinks (`baiduboxapp://`, `weixin://`, `intent://`);
+ * storing one in the tab list or in `last_page` means the next start restores an
+ * error page instead of the page the user was reading.
+ */
+private fun httpOnly(url: String?): String? =
+    url?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
 
 /** One browser tab: only the address and title are kept. */
 private data class TabEntry(val url: String, val title: String)
@@ -224,6 +236,11 @@ fun BrowseScreen() {
     // only be touched from the main thread, so sniffed media is handed over here.
     val sniffQueue = remember { ConcurrentLinkedQueue<SniffedMedia>() }
     val pageHost = remember { AtomicReference<String?>(null) }
+    // Per-page counters for the diagnostic log (see docs/logic-spec.md §20).
+    val pageStartedAt = remember { AtomicLong(0) }
+    val sniffNetCount = remember { AtomicLong(0) }
+    val blockedAtStart = remember { AtomicLong(0) }
+    val lastDrainLogAt = remember { AtomicLong(0) }
 
     fun absorb(list: List<SniffedMedia>) {
         val existing = media.map { it.key }.toHashSet()
@@ -337,6 +354,13 @@ fun BrowseScreen() {
                 val batch = ArrayList<SniffedMedia>()
                 while (true) batch.add(sniffQueue.poll() ?: break)
                 absorb(batch)
+                // A page that never reaches onPageFinished (VPN/timeout) still
+                // shows up here, which is what tells the two cases apart.
+                val now = System.currentTimeMillis()
+                if (batch.isNotEmpty() && now - lastDrainLogAt.get() > 2000) {
+                    lastDrainLogAt.set(now)
+                    Diag.log("SNIFF_NET", "batch=${batch.size} total=${media.size}")
+                }
             }
             adblockOn = AdBlocker.isEnabled()
             blockedCount = AdBlocker.blockedCount()
@@ -670,14 +694,17 @@ fun BrowseScreen() {
 
                         // Restore the active tab first; the older "remember page"
                         // switch stays as a fallback when no tab URL was saved.
-                        val restored = tabs.getOrNull(activeTab)?.url.orEmpty()
-                        if (restored.isNotBlank()) {
+                        // Only http(s) is restorable: a saved deeplink would come
+                        // back as an error page and hide the start page.
+                        val restored = httpOnly(tabs.getOrNull(activeTab)?.url)
+                        if (restored != null) {
                             showStart = false
                             address = restored
                             loadUrl(restored)
                         } else if (prefs.getBoolean("remember_page", false)) {
-                            prefs.getString("last_page", null)?.takeIf { it.isNotBlank() }?.let {
+                            httpOnly(prefs.getString("last_page", null))?.let {
                                 showStart = false
+                                address = it
                                 loadUrl(it)
                             }
                         }
@@ -695,6 +722,16 @@ fun BrowseScreen() {
                                 request: WebResourceRequest?,
                             ): Boolean {
                                 val url = request?.url?.toString() ?: return false
+                                // Domestic sites like to bounce the WebView into their
+                                // own app (`baiduboxapp://`, `weixin://`, `intent://`).
+                                // Letting WebView load it yields ERR_UNKNOWN_URL_SCHEME
+                                // and replaces a perfectly good page with an error
+                                // screen — swallow it instead of handing it to the
+                                // system, so no other app gets launched either.
+                                if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                                    Diag.log("NAV_BLOCKED", Diag.hostOf(url) ?: url.take(24))
+                                    return true
+                                }
                                 // Direct file links would otherwise navigate to a
                                 // page that renders as garbage; turn them into tasks.
                                 if (!looksLikeDownload(url)) return false
@@ -709,28 +746,35 @@ fun BrowseScreen() {
                                 address = if (blank) "" else url ?: address
                                 if (blank) showStart = true
                                 pageHost.set(AdBlocker.hostOf(url ?: ""))
+                                pageStartedAt.set(System.currentTimeMillis())
+                                sniffNetCount.set(0)
+                                blockedAtStart.set(AdBlocker.blockedCount())
                                 canGoBack = v?.canGoBack() ?: false
                                 canGoForward = v?.canGoForward() ?: false
                                 media.clear()
                                 sniffQueue.clear()
+                                if (!blank) Diag.log("PAGE_START", pageHost.get().orEmpty())
                             }
 
                             override fun onPageFinished(v: WebView?, url: String?) {
                                 loading = 1f
                                 canGoBack = v?.canGoBack() ?: false
                                 canGoForward = v?.canGoForward() ?: false
-                                if (url != null && url != "about:blank") {
+                                // Deeplinks are not pages: storing one would make the
+                                // next start restore an error screen.
+                                val page = httpOnly(url)
+                                if (page != null) {
                                     if (activeTab in tabs.indices) {
                                         tabs[activeTab] = TabEntry(
-                                            url = url,
-                                            title = v?.title?.takeIf { it.isNotBlank() } ?: url,
+                                            url = page,
+                                            title = v?.title?.takeIf { it.isNotBlank() } ?: page,
                                         )
                                         persistTabs()
                                     }
                                     if (prefs.getBoolean("remember_page", false)) {
-                                        prefs.edit().putString("last_page", url).apply()
+                                        prefs.edit().putString("last_page", page).apply()
                                     }
-                                    runCatching { android.net.Uri.parse(url).host }.getOrNull()
+                                    runCatching { android.net.Uri.parse(page).host }.getOrNull()
                                         ?.let { host ->
                                             val seen = prefs.getStringSet("visited_hosts", null)
                                                 ?.toMutableSet() ?: mutableSetOf()
@@ -741,12 +785,51 @@ fun BrowseScreen() {
                                             }
                                         }
                                 }
+                                val startedAt = pageStartedAt.get()
+                                val elapsed = if (startedAt > 0) System.currentTimeMillis() - startedAt else -1
+                                Diag.log(
+                                    "PAGE_DONE",
+                                    "host=${AdBlocker.hostOf(url ?: "").orEmpty()} ms=$elapsed " +
+                                        "sniffed=${media.size} net=${sniffNetCount.get()} " +
+                                        "blocked=${AdBlocker.blockedCount() - blockedAtStart.get()} " +
+                                        "js=${v?.settings?.javaScriptEnabled}",
+                                )
                                 if (v == null) return
                                 if (desktopUa) v.evaluateJavascript(DESKTOP_VIEWPORT_JS, null)
-                                if (!snifferEnabled) return
-                                v.evaluateJavascript(Sniffer.PROBE_JS) { raw ->
-                                    absorb(Sniffer.parseProbeResult(raw))
+                                if (!snifferEnabled) {
+                                    Diag.log("SNIFF_OFF", "")
+                                    return
                                 }
+                                v.evaluateJavascript(Sniffer.PROBE_JS) { raw ->
+                                    val parsed = Sniffer.parseProbeResult(raw)
+                                    Diag.log("SNIFF_DOM", "raw=${raw?.length ?: -1} parsed=${parsed.size}")
+                                    absorb(parsed)
+                                }
+                            }
+
+                            override fun onReceivedError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                error: android.webkit.WebResourceError?,
+                            ) {
+                                Diag.log(
+                                    "PAGE_ERR",
+                                    "host=${AdBlocker.hostOf(request?.url?.toString() ?: "").orEmpty()} " +
+                                        "code=${error?.errorCode} main=${request?.isForMainFrame} " +
+                                        "desc=${error?.description}",
+                                )
+                            }
+
+                            override fun onReceivedHttpError(
+                                view: WebView?,
+                                request: WebResourceRequest?,
+                                errorResponse: WebResourceResponse?,
+                            ) {
+                                Diag.log(
+                                    "PAGE_HTTP_ERR",
+                                    "host=${AdBlocker.hostOf(request?.url?.toString() ?: "").orEmpty()} " +
+                                        "status=${errorResponse?.statusCode} main=${request?.isForMainFrame}",
+                                )
                             }
 
                             override fun shouldInterceptRequest(
@@ -769,6 +852,7 @@ fun BrowseScreen() {
                                 if (prefs.getBoolean("sniff", true)) {
                                     val kind = SniffedMedia.kindOf(u, null)
                                     if (kind != SniffedMedia.Kind.FILE) {
+                                        sniffNetCount.incrementAndGet()
                                         sniffQueue.add(
                                             SniffedMedia(
                                                 url = u,
@@ -899,14 +983,15 @@ fun BrowseScreen() {
                                 showTabs = false
                                 activeTab = i
                                 persistTabs()
-                                if (tab.url.isBlank()) {
+                                val target = httpOnly(tab.url)
+                                if (target == null) {
                                     showStart = true
                                     address = ""
                                     webView?.loadUrl("about:blank")
                                 } else {
                                     showStart = false
-                                    address = tab.url
-                                    webView?.loadUrl(tab.url)
+                                    address = target
+                                    webView?.loadUrl(target)
                                 }
                             }
                             .padding(vertical = 12.dp),

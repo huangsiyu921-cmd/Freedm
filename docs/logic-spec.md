@@ -964,6 +964,15 @@ DownloadService.start(ctx) ; Engine.start(id)
 主页:     WebView.loadUrl("about:blank") ; 清空地址栏与嗅探结果 ; showStart = true
 返回键:   canGoBack → goBack()；否则 showStart = false → 回起始页；
           再按 → tab 回下载页；再按 → 退出（均由 BackHandler 注册，后注册者优先）
+
+非 http(s) 导航（shouldOverrideUrlLoading）:
+          国内站点会主动唤起自家 App：baiduboxapp:// / weixin:// / intent:// / tel:
+          处理: 直接吞掉（返回 true）+ 记 NAV_BLOCKED，**不**转交系统，
+                也不让 WebView 去加载（否则得到 ERR_UNKNOWN_URL_SCHEME 错误页，
+                把正常页面顶掉，看起来像"网页崩了、嗅探空了"）
+标签与"记住上次页面"只保存 / 恢复 http(s):
+          旧版本可能已把 deeplink 写进 browser_tabs 或 last_page，
+          启动时 httpOnly(url) 为 null → 不恢复，直接显示起始页
 ```
 
 ## 11.9 应用启动（MainActivity.onCreate）
@@ -1232,8 +1241,7 @@ Box(clip 12dp 圆角, minHeight 64dp)
 # 第 17 部分 · 多选下载确认（候选列表）
 
 > 场景：内置浏览器嗅探到多个媒体后，用户需要**看着候选列表挑几个**批量下载，
-> 而不是逐个点。原产品是一个 `File(s) detected!` 对话框
-> （逆向记录见 `...\1DM+\specs\ui-download-confirm.md`）。
+> 而不是逐个点。
 
 ## 17.1 状态
 
@@ -1323,7 +1331,6 @@ addSelected():
 # 第 18 部分 · 文件类型识别与目录归档
 
 > 两个能力：**认出这是什么文件**（决定图标），以及**该放进哪个目录**（可选归档）。
-> 逆向来源与原产品的完整扩展名表见 `...\1DM+\specs\file-types-and-folders.md`。
 
 ## 18.1 类型枚举
 
@@ -1511,4 +1518,134 @@ shouldInterceptRequest(request):
 | 拦截了页面必需的脚本 | 用户在该站点菜单里关闭过滤即可，无需改列表 |
 | 计数 | 同一资源重试会重复 +1，只作观感指标 |
 | 是否联网更新规则 | **否**。规则只随安装包变化（隐私基线：不产生用户未发起的请求） |
+
+---
+
+## 19.6 用户导入规则（本地文件）
+
+内置名单规模有限，但**不引入网络订阅**。想用更强名单的用户自行导入本地文件。
+
+```
+入口: 设置 →「导入规则文件」→ SAF OpenDocument（text/plain 或 */*）
+
+解析 parseRuleLine(raw):
+    line ← raw 去掉 '#' 及其后，trim
+    if line 为空                      ⊥ null
+    parts ← 按空格/制表符切分
+    candidate ←
+        parts.size >= 2 且 parts[0] 以数字开头  → parts[1]     // hosts 格式 "0.0.0.0 ads.x.com"
+        parts.size == 1                         → parts[0]     // 纯域名
+        其它                                    → null        // 带路径/参数的行直接丢
+    host ← candidate 小写、去 '*.', 去前导 '.', 去尾部 '.'
+    if host 为空或 host 不含 '.'      ⊥ null
+    if host 含 '/', '^', '|'          ⊥ null        // ★ 主动拒绝 Adblock 语法
+    ⊥ host
+
+持久化: files/adblock_user.txt（覆盖写，一次导入=一份完整名单）
+加载:   ensureLoaded 时与内置名单一起读入 userRules
+匹配:   matches 同时查 rules 与 userRules（同一套父域回退）
+清空:   删除文件 + 清 userRules，立即生效
+```
+
+**为什么主动拒绝而不是"尽力解析"**
+
+`||ads.example.com^`、`/banner/*`、`##.ad`、`/re\.gex/` 这些行如果被"尽力"取出一部分
+当域名用，会得到错误的域名（比如从 `||x.com^` 里取出 `x.com^`），后果是**静默失效**或**误拦整站**。
+宁可丢弃并告诉用户"没读到有效规则"，也不要产生不可预期的匹配。
+
+用户看到的反馈只有两种：`导入 N 条` / `没读到有效规则`。
+
+## 19.7 与同类产品的边界对照（为什么不做更多）
+
+同类产品的过滤引擎支持范围（作为"要不要跟"的参照）：
+
+- **三类规则**：网络请求规则、元素隐藏规则、hosts 规则
+- **语法特性**：主机锚点（`||`）、左右锚（`|` `^`）、正则、例外规则（`@@`）、
+  16 种资源类型限定（脚本/图片/媒体/XHR…）、`$third-party`、`$important`、`$redirect`
+- **来源**：多源订阅 + 自动更新（AdGuard / uBlock / EasyList 等公共列表）
+
+**本项目刻意不做这些**，理由：
+
+| 不做的项 | 理由 |
+|---|---|
+| 路径 / 正则规则 | 下载管理器对**误杀**零容忍：一条路径规则可能吃掉正常下载链接；正则更甚（性能 + 误伤双风险） |
+| 元素隐藏（`##`） | 需要向页面注入可变 CSS，与"注入脚本随包固定、不下发"的原则冲突 |
+| 网络订阅 + 自动更新 | 违反隐私基线（不产生用户未发起的请求）；且 EasyList/uBlock/AdGuard 均为 **GPLv3 系**，与本项目 Apache-2.0 许可不兼容 |
+| 大名单内置 | 同上许可证问题。改用"自建小名单 + 用户自行导入"，责任边界清晰 |
+
+保留的能力已经覆盖绝大多数广告：广告资源通常来自**独立的第三方域名**，按域名拦截即可命中。
+
+---
+
+# 第 20 部分 · 诊断日志（Diag）
+
+正式版也开启的本地日志，用来捕捉"嗅探为空 / 页面打不开"这类在开发机上复现不了的问题。
+**不上传、不联网、不含任何标识符。**
+
+## 20.1 位置与轮转
+
+```
+位置: <外部私有目录>/logs/diag.log
+      Android 上即 Android/data/<applicationId>/files/logs/diag.log
+      （无需任何权限即可写入；USB 或文件管理器可直接取出，不用 root）
+
+轮转: 写前若 diag.log > 512 KiB → 删除旧的 diag.1.log → 当前文件改名为 diag.1.log
+      即最多两份，总量上限约 1 MiB
+
+写入: 单线程队列（Executors.newSingleThreadExecutor），WebView 回调永远不阻塞在磁盘上
+开关: prefs["diag_log"]，默认 true；设置页「诊断」分组可关、可清空
+```
+
+## 20.2 行格式
+
+```
+<MM-dd HH:mm:ss.SSS>  <EVENT>  <detail 截断 240 字符>
+```
+
+| 事件 | detail | 回答什么问题 |
+|---|---|---|
+| `APP_START` | `sdk=36` | 进程是否重启（对比前后行时间） |
+| `NET_AVAILABLE` | `wifiWaiting=N` | 网络恢复时有没有等待 Wi-Fi 的任务 |
+| `NET_LOST` | `wifi=true/false` | 断网回调 |
+| `NET_TRANSPORT` | `wifi` / `wifi vpn` / `cell vpn` / `none` | **VPN 是否在默认网络上**；只在组合变化时记一条 |
+| `PAGE_START` | `host` | 主文档开始加载 |
+| `PAGE_DONE` | `host ms=… sniffed=… net=… blocked=… js=…` | 主文档完成 + 本页嗅探/拦截汇总 |
+| `PAGE_ERR` | `host code=… main=… desc=…` | 资源或主文档失败（`ERR_TIMED_OUT`、`ERR_CONNECTION_REFUSED`…） |
+| `PAGE_HTTP_ERR` | `host status=… main=…` | 4xx/5xx |
+| `SNIFF_DOM` | `raw=<返回值长度> parsed=<条数>` | DOM 脚本是否执行、有没有结果 |
+| `SNIFF_NET` | `batch=… total=…` | 网络层候选（2 秒节流一次） |
+| `SNIFF_OFF` | 空 | 嗅探被关掉 |
+| `NAV_BLOCKED` | host 或 URL 前 24 字符 | 非 http(s) 导航被吞（`baiduboxapp://` 等） |
+| `TASK_START` | `id bytes seg host` | 下载开始（含探测结果） |
+| `TASK_DONE` | `id bytes` | 下载完成 |
+| `TASK_FAIL` | `id 异常类型: 消息` | 下载失败原因 |
+| `TASK_WIFI_WAIT` | `id` | 因仅 Wi-Fi 约束自己暂停 |
+| `SEG_RETRY` | `id seg attempt 异常` | 分段重试（VPN 抖动时会连着出现） |
+
+## 20.3 隐私边界（不可放宽）
+
+- **只记**：事件名、主机名、计数、错误码、异常类型。
+- **不记**：完整 URL（含 query/token）、Cookie、请求/响应体、`installId`、任何设备标识。
+- 日志留在应用自己的外部目录内，卸载即删；应用从不读取它、更不上传。
+- 关掉开关后不再写新行（已有内容不自动删除，需要用户在设置页点「清空」）。
+
+## 20.4 取日志
+
+```powershell
+adb shell cat /storage/emulated/0/Android/data/<applicationId>/files/logs/diag.log
+adb pull /storage/emulated/0/Android/data/<applicationId>/files/logs/diag.log
+```
+
+`<applicationId>`：release 为 `com.huangsy.freedm`，debug 为 `com.huangsy.freedm.dev`。
+
+## 20.5 怎么用它区分故障类型
+
+| 观察 | 结论 |
+|---|---|
+| 只有 `PAGE_START`，没有 `PAGE_DONE`，也没有 `PAGE_ERR` | 请求卡住（超时 / VPN 黑洞），不是嗅探问题 |
+| `PAGE_START` 后紧跟 `PAGE_ERR main=true code=-10` | 页面被 deeplink 顶掉（已由 §11.8 的拦截修掉） |
+| `PAGE_DONE … net=0` 且 `SNIFF_DOM parsed=0` | 该页确实没有媒体资源（如百度首页） |
+| `PAGE_DONE … net>0 sniffed=0`，之后仍有 `SNIFF_NET` | 队列没被抽干或合并出错（查主线程是否被阻塞） |
+| `NET_TRANSPORT` 出现 `vpn` 之后开始 `PAGE_ERR` | 问题在 VPN 链路，不在 WebView |
+| `SEG_RETRY` 连续 3 次后 `TASK_FAIL` | 下载侧网络不稳（同样受 VPN 影响） |
 

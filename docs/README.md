@@ -4,16 +4,14 @@
 
 | 顺序 | 文档 | 回答什么问题 |
 |---|---|---|
-| 1 | `...\global-workspace\1DM+\specs\behavior-spec.md` | 要实现**什么行为**：分片、续传、嗅探、隐私基线（§7 是实现状态表，§8 是隐含约定） |
-| 2 | `...\global-workspace\1DM+\specs\ui-spec.md` | 界面**长什么样**：信息架构、每页有什么、哪些明说不做 |
-| 3 | [`implementation-guide.md`](implementation-guide.md) | 代码**怎么接起来**：状态机迁移表、每个动作的完整调用序列、线程模型、常量 |
-| 4 | [`logic-spec.md`](logic-spec.md) | **逐函数伪代码**：13 个部分，每个函数逐分支、每个边界写死，可逐行对照实现 |
-| 5 | [`known-pitfalls.md`](known-pitfalls.md) | 写代码**前**扫一遍：16 个会静默出错的坑 |
-| 6 | [`acceptance.md`](acceptance.md) | **怎么验收**：每条都有可执行命令和判定标准 |
+| 1 | [`logic-spec.md`](logic-spec.md) | **要实现什么 + 逐函数伪代码**：19 个部分，每个分支、每个边界写死，可逐行对照实现 |
+| 2 | [`implementation-guide.md`](implementation-guide.md) | 代码**怎么接起来**：状态机迁移表、每个动作的完整调用序列、线程模型、常量 |
+| 3 | [`known-pitfalls.md`](known-pitfalls.md) | 写代码**前**扫一遍：16 个会静默出错的坑 |
+| 4 | [`acceptance.md`](acceptance.md) | **怎么验收**：每条都有可执行命令和判定标准 |
 
-> 想直接写代码 → 读 3 和 4。
-> 想理解需求 → 读 1 和 2。
-> 想少踩坑 → 读 5。
+> 想直接写代码 → 读 1 和 2。
+> 想少踩坑 → 读 3。
+> 想确认做完了 → 读 4。
 
 ## `logic-spec.md` 覆盖了什么
 

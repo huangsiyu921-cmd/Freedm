@@ -10,14 +10,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 
 /**
- * Segmented progress, a clean-room reimplementation of the visual behaviour
- * observed in 1DM+ (`ProgressView.onDraw`).
+ * Segmented progress: the bar is split into `partCount` equal slices laid out in
+ * file order, and each slice is filled by its own completion ratio.
  *
  * Geometry, for `partCount = n`:
  *  - every part is `width / n` wide, laid out left to right in **file order**;
  *  - a part is filled from its own left edge by `percent * partWidth`;
  *  - when the *previous* part is not yet complete, the first 1 px of this part is
- *    left empty (1DM+ paints it transparent), which reads as a thin dark seam;
+ *    left empty, which reads as a thin seam;
  *  - when the previous part **is** complete, the seam is dropped so the two parts
  *    join into one continuous bar — which is why a finished row looks solid.
  *
@@ -64,8 +64,8 @@ fun SegmentProgressBar(
 }
 
 /**
- * Renders a segmented bar as the **row background** (1DM+ draws the progress
- * behind the whole list item rather than in a thin strip), with content on top.
+ * Renders a segmented bar as the **row background** — the progress sits behind the
+ * whole row rather than in a thin strip — with content layered on top.
  */
 @Composable
 fun SegmentedProgressBackground(

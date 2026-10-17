@@ -35,7 +35,9 @@ data class SniffedMedia(
             }
         }
 
-        private val VIDEO_EXT = listOf(".mp4", ".webm", ".mkv", ".mov", ".flv", ".ts")
+        // `.m4s` is what Bilibili/YouTube-style DASH players request per fragment;
+        // without it the network layer sees the busiest media traffic as "FILE".
+        private val VIDEO_EXT = listOf(".mp4", ".m4s", ".webm", ".mkv", ".mov", ".flv", ".ts")
         private val AUDIO_EXT = listOf(".mp3", ".m4a", ".aac", ".ogg", ".opus", ".wav")
     }
 }
@@ -61,7 +63,7 @@ object Sniffer {
           });
           document.querySelectorAll('a[href]').forEach(function (a) {
             var href = a.href || '';
-            if (/\.(mp4|webm|mkv|mov|m3u8|mpd|mp3|m4a|aac|ogg|flv|ts)(\?|#|$)/i.test(href)) {
+            if (/\.(mp4|m4s|webm|mkv|mov|m3u8|mpd|mp3|m4a|aac|ogg|flv|ts)(\?|#|$)/i.test(href)) {
               push(href, (a.textContent || '').trim());
             }
           });

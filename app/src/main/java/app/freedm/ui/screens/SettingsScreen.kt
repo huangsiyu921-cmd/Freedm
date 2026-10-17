@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.freedm.browser.AdBlocker
 import app.freedm.data.Repo
+import app.freedm.diag.Diag
 import app.freedm.engine.Engine
 import app.freedm.ui.theme.START_TAB
 import app.freedm.ui.theme.THEME_DYNAMIC
@@ -72,6 +73,27 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
     var dynamicColor by remember { mutableStateOf(prefs.getBoolean(THEME_DYNAMIC, false)) }
     var startTab by remember { mutableStateOf(prefs.getString(START_TAB, "downloads") ?: "downloads") }
     val ctx = androidx.compose.ui.platform.LocalContext.current
+    var diagOn by remember { mutableStateOf(Diag.isEnabled()) }
+    var diagSize by remember { mutableStateOf(Diag.sizeBytes()) }
+    var userRuleCount by remember {
+        mutableStateOf(run {
+            AdBlocker.ensureLoaded(ctx)
+            AdBlocker.userRuleCount()
+        })
+    }
+    val importRules = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri != null) {
+            val added = AdBlocker.importFrom(ctx, uri)
+            userRuleCount = AdBlocker.userRuleCount()
+            android.widget.Toast.makeText(
+                ctx,
+                if (added > 0) "导入 $added 条" else "没读到有效规则",
+                android.widget.Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
 
     Scaffold(topBar = { TopAppBar(title = { Text("设置") }) }) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad)) {
@@ -308,6 +330,52 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
                 )
             }
             item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { importRules.launch(arrayOf("text/plain", "*/*")) }
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("导入规则文件", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            if (userRuleCount > 0) {
+                                "已导入 $userRuleCount 条 · 只接受域名格式"
+                            } else {
+                                "只接受域名或 hosts 格式，路径与正则会被忽略"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            if (userRuleCount > 0) {
+                item {
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val n = AdBlocker.clearUserRules(ctx)
+                                userRuleCount = 0
+                                android.widget.Toast.makeText(
+                                    ctx, "已清除 $n 条", android.widget.Toast.LENGTH_SHORT,
+                                ).show()
+                            }
+                            .padding(horizontal = 20.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            "清空导入的规则",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            }
+            item {
                 SwitchRow(
                     label = "桌面版页面",
                     description = "请求网站的桌面版页面",
@@ -385,6 +453,46 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
                         "查看",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+            }
+
+            item { GroupTitle("诊断") }
+            item {
+                SwitchRow(
+                    label = "记录诊断日志",
+                    description = "只记域名与错误码，存在应用外部目录，不上传",
+                    checked = diagOn,
+                    onChange = {
+                        diagOn = it
+                        Diag.setEnabled(it)
+                    },
+                )
+            }
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            Diag.clear()
+                            diagSize = 0L
+                        }
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("清空诊断日志", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            Diag.location() ?: "—",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        formatBytes(diagSize),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }

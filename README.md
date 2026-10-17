@@ -32,6 +32,7 @@
 - **分享接收**：`ACTION_SEND` / `ACTION_VIEW` 直接建任务
 - **剪贴板识别**：默认关闭，仅前台生效，不保存原文
 - **导出**：可选复制到系统 Downloads（MediaStore）
+- **诊断日志**：`Android/data/<包名>/files/logs/diag.log`，只记域名与错误码，设置页可关可清空
 
 ## 构建
 
