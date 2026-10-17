@@ -19,7 +19,7 @@ import java.io.File
 object Exporter {
 
     fun exportIfEnabled(context: Context, file: File, displayName: String) {
-        if (!Repo.prefs().getBoolean("export_public", false)) return
+        if (!Repo.prefs().getBoolean("export_public", true)) return
         if (!file.exists() || file.length() == 0L) return
 
         runCatching {

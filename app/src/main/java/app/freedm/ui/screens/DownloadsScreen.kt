@@ -319,9 +319,6 @@ private fun TaskCard(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
-            // A finished row opens the file directly; anything still in flight
-            // opens the detail page instead.
-            .clickable(onClick = if (done && onOpen != null) onOpen else onClick)
             .heightIn(min = 64.dp),
     ) {
         // Progress is the row background, not a separate strip.
@@ -352,10 +349,17 @@ private fun TaskCard(
             Column(
                 Modifier
                     .weight(1f)
+                    // Tap lives on the text block only: a row-wide clickable
+                    // would sit on top of the action button and swallow its tap.
+                    .clickable(onClick = if (done && onOpen != null) onOpen else onClick)
                     .padding(start = 8.dp),
             ) {
                 Text(
-                    text = task.fileName,
+                    text = buildString {
+                        append(task.fileName)
+                        val size = if (total > 0) total else downloaded
+                        if (size > 0) append(" | ").append(formatBytes(size))
+                    },
                     fontSize = 14.sp,
                     color = onTop,
                     maxLines = 1,

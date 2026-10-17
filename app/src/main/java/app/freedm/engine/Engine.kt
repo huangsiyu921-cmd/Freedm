@@ -23,8 +23,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runInterruptible
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.InterruptedIOException
 import java.io.IOException
 import java.io.RandomAccessFile
 import java.net.HttpURLConnection
@@ -56,6 +58,12 @@ object Engine {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<Long, Job>()
+
+    /**
+     * Explicit pause markers. Coroutine cancellation alone is not enough: the
+     * transfer threads sit in blocking socket reads that never observe it.
+     */
+    private val paused = java.util.concurrent.ConcurrentHashMap.newKeySet<Long>()
     private val progressData = ConcurrentHashMap<Long, TaskProgress>()
 
     private val _progress = MutableStateFlow<Map<Long, TaskProgress>>(emptyMap())
@@ -71,6 +79,7 @@ object Engine {
 
     fun start(id: Long) {
         if (jobs.containsKey(id)) return
+        paused.remove(id)
         RateLimiter.setRate(Repo.prefs().getLong("speed_limit", 0L))
 
         val job = scope.launch(start = CoroutineStart.LAZY) {
@@ -95,6 +104,7 @@ object Engine {
     }
 
     fun pause(id: Long) {
+        paused.add(id)
         jobs[id]?.let { scope.launch { it.cancelAndJoin() } }
         if (!isRunning(id)) Repo.setState(id, TaskState.PAUSED)
     }
@@ -234,8 +244,14 @@ object Engine {
                     plan.forEach { seg ->
                         launch(Dispatchers.IO) {
                             val acc = segProgress.getValue(seg)
-                            val ok = fetchSegment(id, task, seg, raf, acc) { delta ->
-                                counter.addAndGet(delta)
+                            // Blocking socket reads ignore coroutine cancellation, so
+                            // pause() would leave the transfer running; wrapping in
+                            // runInterruptible makes cancel() interrupt the read.
+                            val self = coroutineContext[Job]
+                            val ok = runInterruptible {
+                                fetchSegment(id, task, seg, raf, acc, { self?.isActive == false }) { delta ->
+                                    counter.addAndGet(delta)
+                                }
                             }
                             if (!ok) error("分段 ${seg.index} 下载失败")
                             Repo.markSegment(id, seg.index, seg.length, TaskState.COMPLETED)
@@ -280,6 +296,7 @@ object Engine {
         seg: Segment,
         raf: RandomAccessFile,
         written: AtomicLong,
+        cancelled: () -> Boolean,
         onBytes: (Long) -> Unit,
     ): Boolean {
         val url = task.finalUrl ?: task.url
@@ -289,6 +306,7 @@ object Engine {
         while (attempt < MAX_RETRY) {
             attempt++
             try {
+                if (taskId in paused || cancelled()) throw CancellationException("paused")
                 if (expected >= 0 && written.get() >= expected) return true
 
                 val from = seg.startByte + written.get()
@@ -316,6 +334,9 @@ object Engine {
                         val buf = ByteArray(BUF_SIZE)
                         var pos = from
                         while (true) {
+                            // A blocking socket read does not honour coroutine
+                            // cancellation, so pause has to be polled here.
+                            if (taskId in paused || cancelled()) throw CancellationException("paused")
                             val n = input.read(buf)
                             if (n <= 0) break
                             synchronized(raf) {
@@ -338,9 +359,17 @@ object Engine {
                 } finally {
                     runCatching { conn.disconnect() }
                 }
+            } catch (e: CancellationException) {
+                Repo.markSegment(taskId, seg.index, written.get(), TaskState.QUEUED)
+                throw e
             } catch (e: Exception) {
                 // Persist the offset reached so even a process death resumes here.
                 Repo.markSegment(taskId, seg.index, written.get(), TaskState.QUEUED)
+                // A pause surfaces here as an interrupt: propagate it instead of
+                // retrying, otherwise the segment would restart on its own.
+                if (e is InterruptedIOException || Thread.currentThread().isInterrupted) {
+                    throw CancellationException("paused")
+                }
                 if (attempt >= MAX_RETRY) return false
                 // Exponential backoff: 1s, 2s, 4s.
                 Thread.sleep(1000L shl (attempt - 1))

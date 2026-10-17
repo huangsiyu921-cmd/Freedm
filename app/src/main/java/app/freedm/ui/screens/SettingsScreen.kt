@@ -32,6 +32,17 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.freedm.data.Repo
 import app.freedm.engine.Engine
+import app.freedm.ui.formatBytes
+import kotlin.math.ln
+
+/** 0..1 slider position ↔ 1 MB/s … 100 MB/s, logarithmic. */
+private const val MB = 1024.0 * 1024.0
+
+private fun posToBps(pos: Float): Long =
+    (Math.pow(100.0, pos.toDouble().coerceIn(0.0, 1.0)) * MB).toLong()
+
+private fun bpsToPos(bps: Long): Float =
+    if (bps <= 0L) 0.6f else (ln(bps / MB) / ln(100.0)).toFloat().coerceIn(0f, 1f)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,12 +52,13 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
     var threads by remember { mutableStateOf(prefs.getInt("threads", 8).toFloat()) }
     var wifiOnly by remember { mutableStateOf(prefs.getBoolean("wifi_only", false)) }
     var autoResume by remember { mutableStateOf(prefs.getBoolean("auto_resume", true)) }
-    var exportPublic by remember { mutableStateOf(prefs.getBoolean("export_public", false)) }
-    var speedLimitMb by remember {
-        mutableStateOf((prefs.getLong("speed_limit", 0L) / (1024.0 * 1024.0)).toFloat())
-    }
+    var exportPublic by remember { mutableStateOf(prefs.getBoolean("export_public", true)) }
     var sniff by remember { mutableStateOf(prefs.getBoolean("sniff", true)) }
+    var desktopUa by remember { mutableStateOf(prefs.getBoolean("desktop_ua", false)) }
+    var jsEnabled by remember { mutableStateOf(prefs.getBoolean("js_enabled", true)) }
+    var rememberPage by remember { mutableStateOf(prefs.getBoolean("remember_page", false)) }
     var clipWatch by remember { mutableStateOf(prefs.getBoolean("clipboard_watch", false)) }
+    val ctx = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(topBar = { TopAppBar(title = { Text("设置") }) }) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad)) {
@@ -89,19 +101,59 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
                 )
             }
             item {
-                SliderRow(
-                    label = "全局限速",
-                    value = speedLimitMb,
-                    range = 0f..10f,
-                    steps = 9,
-                    display = if (speedLimitMb < 0.5f) "关闭" else "${speedLimitMb.toInt()} MB/s",
-                    onChange = {
-                        speedLimitMb = it
-                        val bps = if (it < 0.5f) 0L else (it * 1024 * 1024).toLong()
-                        prefs.edit().putLong("speed_limit", bps).apply()
-                        app.freedm.engine.RateLimiter.setRate(bps)
-                    },
-                )
+                // Logarithmic 1 MB/s … 100 MB/s: equal drag distance per decade,
+                // so the slow end stays adjustable.
+                var limitOn by remember { mutableStateOf(prefs.getLong("speed_limit", 0L) > 0L) }
+                var pos by remember {
+                    mutableStateOf(bpsToPos(prefs.getLong("speed_limit", 0L)))
+                }
+                Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("全局限速", style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                if (limitOn) "${formatBytes(posToBps(pos))}/s" else "关闭",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Switch(
+                            checked = limitOn,
+                            onCheckedChange = {
+                                limitOn = it
+                                val bps = if (it) posToBps(pos) else 0L
+                                prefs.edit().putLong("speed_limit", bps).apply()
+                                app.freedm.engine.RateLimiter.setRate(bps)
+                            },
+                        )
+                    }
+                    if (limitOn) {
+                        Slider(
+                            value = pos,
+                            onValueChange = { pos = it },
+                            valueRange = 0f..1f,
+                            onValueChangeFinished = {
+                                val bps = posToBps(pos)
+                                prefs.edit().putLong("speed_limit", bps).apply()
+                                app.freedm.engine.RateLimiter.setRate(bps)
+                            },
+                        )
+                        Row(Modifier.fillMaxWidth()) {
+                            Text(
+                                "1 MB/s",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.weight(1f))
+                            Text(
+                                "100 MB/s",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
             }
             item {
                 SwitchRow(
@@ -170,6 +222,68 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
                         prefs.edit().putBoolean("sniff", it).apply()
                     },
                 )
+            }
+            item {
+                SwitchRow(
+                    label = "桌面版页面",
+                    description = "请求网站的桌面版页面",
+                    checked = desktopUa,
+                    onChange = {
+                        desktopUa = it
+                        prefs.edit().putBoolean("desktop_ua", it).apply()
+                    },
+                )
+            }
+            item {
+                SwitchRow(
+                    label = "启用 JavaScript",
+                    description = "关闭后多数网站无法正常显示",
+                    checked = jsEnabled,
+                    onChange = {
+                        jsEnabled = it
+                        prefs.edit().putBoolean("js_enabled", it).apply()
+                    },
+                )
+            }
+            item {
+                SwitchRow(
+                    label = "记住上次页面",
+                    description = "打开浏览页时恢复上次访问的网址",
+                    checked = rememberPage,
+                    onChange = {
+                        rememberPage = it
+                        prefs.edit().putBoolean("remember_page", it).apply()
+                    },
+                )
+            }
+            item {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable {
+                            runCatching {
+                                android.webkit.CookieManager.getInstance().removeAllCookies(null)
+                                android.webkit.CookieManager.getInstance().flush()
+                                android.webkit.WebStorage.getInstance().deleteAllData()
+                                prefs.edit().remove("last_page").apply()
+                            }
+                            android.widget.Toast.makeText(
+                                ctx, "已清除", android.widget.Toast.LENGTH_SHORT,
+                            ).show()
+                        }
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text("清除浏览数据", style = MaterialTheme.typography.bodyLarge)
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            "Cookie、本地存储、上次页面",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
             }
 
             item { GroupTitle("隐私") }

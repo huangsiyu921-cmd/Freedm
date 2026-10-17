@@ -72,6 +72,11 @@ object Prober {
     const val UA =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +
             "Chrome/124.0 Mobile Safari/537.36 FreeDM/0.1"
+
+    /** Used when the user asks the built-in browser to render as desktop. */
+    const val DESKTOP_UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) " +
+            "Chrome/124.0 Safari/537.36"
 }
 
 /** Derives a usable file name; never trusts the network blindly. */

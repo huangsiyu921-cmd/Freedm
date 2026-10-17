@@ -37,8 +37,18 @@ object Repo {
     private val _segments = MutableStateFlow<Map<Long, List<Segment>>>(emptyMap())
     val segments: StateFlow<Map<Long, List<Segment>>> = _segments.asStateFlow()
 
+    /**
+     * Where finished and in-progress files live.
+     *
+     * On app-specific *external* storage (`/sdcard/Android/data/<pkg>/files/FreeDM`),
+     * not under `/data/data/…`: segment writes need random access so MediaStore is
+     * out, but the file must still be reachable without root.
+     */
     val downloadsDir: File
-        get() = File(appContext.filesDir, "downloads").apply { mkdirs() }
+        get() = File(
+            appContext.getExternalFilesDir(null) ?: appContext.filesDir,
+            "FreeDM",
+        ).apply { mkdirs() }
 
     fun init(context: Context) {
         appContext = context.applicationContext

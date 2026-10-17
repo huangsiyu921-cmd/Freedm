@@ -1,4 +1,4 @@
-package app.freedm
+﻿package app.freedm
 
 import android.Manifest
 import android.content.Intent
@@ -9,26 +9,43 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import app.freedm.data.Repo
 import app.freedm.ui.ShareBus
@@ -73,7 +90,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             FreeDmTheme {
-                // Window background is white (§themes.xml), so paint the whole
+                // Window background is white (themes.xml), so paint the whole
                 // root with the theme colour rather than letting it show through
                 // around native views.
                 Surface(
@@ -123,13 +140,28 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private enum class Tab { DOWNLOADS, BROWSE, SETTINGS }
+private enum class Tab(val label: String, val icon: ImageVector) {
+    DOWNLOADS("下载", Icons.Default.Home),
+    BROWSE("浏览", Icons.Default.Search),
+    SETTINGS("设置", Icons.Default.Settings),
+}
 
 @Composable
 private fun AppRoot(scope: CoroutineScope) {
     var tab by remember { mutableStateOf(Tab.DOWNLOADS) }
     var detailId by remember { mutableStateOf<Long?>(null) }
     var showPrivacy by remember { mutableStateOf(false) }
+
+    // A link shared in from another app (or the clipboard watcher) must land on
+    // the download tab, otherwise the sheet never composes and the link is lost.
+    val shared by ShareBus.pending.collectAsState()
+    LaunchedEffect(shared) {
+        if (shared != null) {
+            showPrivacy = false
+            detailId = null
+            tab = Tab.DOWNLOADS
+        }
+    }
 
     // System back (button or edge gesture): unwind one layer at a time. The
     // innermost handler registered last wins, so overlays beat the tab reset.
@@ -147,28 +179,7 @@ private fun AppRoot(scope: CoroutineScope) {
     }
 
     Scaffold(
-        bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = tab == Tab.DOWNLOADS,
-                    onClick = { tab = Tab.DOWNLOADS },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text("下载") },
-                )
-                NavigationBarItem(
-                    selected = tab == Tab.BROWSE,
-                    onClick = { tab = Tab.BROWSE },
-                    icon = { Icon(Icons.Default.Search, contentDescription = null) },
-                    label = { Text("浏览") },
-                )
-                NavigationBarItem(
-                    selected = tab == Tab.SETTINGS,
-                    onClick = { tab = Tab.SETTINGS },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                    label = { Text("设置") },
-                )
-            }
-        },
+        bottomBar = { SlimBottomBar(tab) { tab = it } },
     ) { pad ->
         Box(
             Modifier
@@ -179,6 +190,51 @@ private fun AppRoot(scope: CoroutineScope) {
                 Tab.DOWNLOADS -> DownloadsScreen(scope = scope, onOpenDetail = { detailId = it })
                 Tab.BROWSE -> BrowseScreen()
                 Tab.SETTINGS -> SettingsScreen(onOpenPrivacy = { showPrivacy = true })
+            }
+        }
+    }
+}
+
+/** A slimmer bar than M3's NavigationBar (80dp + insets → 52dp + insets). */
+@Composable
+private fun SlimBottomBar(current: Tab, onSelect: (Tab) -> Unit) {
+    val scheme = MaterialTheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .background(scheme.surfaceContainer)
+            .navigationBarsPadding()
+            .height(52.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceEvenly,
+    ) {
+        Tab.entries.forEach { item ->
+            val selected = item == current
+            val tint = if (selected) scheme.primary else scheme.onSurfaceVariant
+            Column(
+                Modifier
+                    .weight(1f)
+                    .fillMaxHeight()
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onSelect(item) },
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    item.icon,
+                    contentDescription = null,
+                    tint = tint,
+                    modifier = Modifier.size(20.dp),
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    item.label,
+                    fontSize = 10.sp,
+                    color = tint,
+                    fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                )
             }
         }
     }
