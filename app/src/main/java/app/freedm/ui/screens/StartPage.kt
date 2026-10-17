@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -59,6 +60,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
@@ -141,7 +143,7 @@ fun StartPage(
                 dragX,
                 -direction * w,
                 // Material's emphasized-decelerate: starts brisk, lands softly.
-                animationSpec = tween(260, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)),
+                animationSpec = tween(200, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)),
             ) { v: Float, _: Float -> dragX = v }
             index = ((index + direction) % count + count) % count
             // The neighbour card has already travelled to the centre, so reset
@@ -202,17 +204,19 @@ fun StartPage(
                                 dragX += pan.x
                                 event.changes.forEach { it.consume() }
                             } else if (axis == 2) {
-                                unfold = (unfold - pan.y / 900f).coerceIn(0f, 1f)
+                                // Up = unfold (longer travel), down = fold back (shorter travel).
+                                val travel = if (pan.y < 0f) 1000f else 620f
+                                unfold = (unfold - pan.y / travel).coerceIn(0f, 1f)
                                 event.changes.forEach { it.consume() }
                             }
                         }
                         when (axis) {
                             1 -> {
-                                val w = size.width * 0.93f
+                                val w = size.width.toFloat()
                                 cardWidth.floatValue = w
                                 when {
-                                    dragX < -w * 0.18f -> flip(1)
-                                    dragX > w * 0.18f -> flip(-1)
+                                    dragX < -w * 0.12f -> flip(1)
+                                    dragX > w * 0.12f -> flip(-1)
                                     else -> scope.launch {
                                         animate(
                                             dragX,
@@ -236,70 +240,102 @@ fun StartPage(
                 Box(
                     Modifier
                         .fillMaxSize()
+                        // Travel a full container width: the card is centred inside
+                        // it, so using the card's own width left its rounded edge
+                        // peeking back in at the side.
+                        .onSizeChanged { cardWidth.floatValue = it.width.toFloat() }
                         .graphicsLayer { alpha = deckAlpha },
                     contentAlignment = Alignment.Center,
                 ) {
-                    for (depth in 2 downTo 1) {
-                        val back = deck.getOrNull((index + depth) % count) ?: continue
-                        BackCard(
-                            site = back,
-                            modifier = Modifier
-                                .fillMaxWidth(if (depth == 1) 0.90f else 0.87f)
-                                .height(160.dp)
-                                .graphicsLayer {
-                                    // Classic card-pile: each card below is a little
-                                    // narrower and pushed further down, so the stack
-                                    // reads as stacked sheets rather than one shrinking
-                                    // card blurred into the next.
-                                    translationY = depth * 18.dp.toPx()
-                                    // Fade out while a drag is in flight so the
-                                    // neighbour card never overlaps a static one.
-                                    val fade = (1f - abs(dragX) / (cardWidth.floatValue * 0.35f))
-                                        .coerceIn(0f, 1f)
-                                    alpha = (if (depth == 1) 0.95f else 0.75f) * fade
-                                },
+                    val w = cardWidth.floatValue
+                    // -1..0 = pulling the next card in, 0..1 = pulling the previous one.
+                    val pull = (dragX / w).coerceIn(-1f, 1f)
+                    val forward = pull < 0f
+                    val p = abs(pull)
+
+                    // Geometry of a resting stack: each card below is narrower and
+                    // sits lower. Cards animate between these slots while dragging.
+                    val frontFrac = 0.93f
+                    val midFrac = 0.90f
+                    val lowFrac = 0.87f
+                    val midY = 18.dp
+                    val lowY = 36.dp
+
+                    if (forward) {
+                        // Next card: the card below rises into place while a fresh one
+                        // slides in at the bottom of the stack. No third layer in between.
+                        val incoming = deck.getOrNull((index + 2) % count)
+                        StackCard(
+                            site = incoming,
+                            frac = lowFrac,
+                            x = (1f - p) * w,
+                            y = lowY,
+                            alpha = 1f,
                         )
-                    }
-
-                    // The neighbour rides in from the far side while the front
-                    // card leaves — but only once the drag is deliberate, and it
-                    // fades in so it never pops up beside the card.
-                    val nbAlpha = (abs(dragX) / (cardWidth.floatValue * 0.3f)).coerceIn(0f, 1f)
-                    if (nbAlpha > 0.02f) {
-                        val nbIndex = if (dragX < 0f) (index + 1) % count else (index - 1 + count) % count
-                        val nb = deck.getOrNull(nbIndex)
-                        val w = cardWidth.floatValue
-                        val offset = if (dragX < 0f) dragX + w else dragX - w
-                        val nbModifier = Modifier
-                            .fillMaxWidth(0.93f)
+                        StackCard(
+                            site = deck.getOrNull((index + 1) % count),
+                            frac = androidx.compose.ui.util.lerp(frontFrac, midFrac, p),
+                            x = 0f,
+                            y = androidx.compose.ui.unit.lerp(0.dp, midY, p),
+                            alpha = androidx.compose.ui.util.lerp(1f, 0.95f, p),
+                        )
+                        val frontModifier = Modifier
+                            .fillMaxWidth(frontFrac)
                             .height(160.dp)
-                            .graphicsLayer {
-                                translationX = offset
-                                alpha = nbAlpha
-                            }
-                        if (nb == null) {
-                            BackCard(site = null, modifier = nbModifier)
+                            .graphicsLayer { translationX = dragX }
+                        if (front == null) {
+                            AddCard(frontModifier, onClick = { adding = true })
                         } else {
-                            CardFace(site = nb, modifier = nbModifier)
+                            CardFace(
+                                site = front,
+                                modifier = frontModifier.pointerInput(front.url) {
+                                    detectTapGestures(
+                                        onTap = { onOpen(front.url) },
+                                        onLongPress = { editing = front },
+                                    )
+                                },
+                            )
                         }
-                    }
-
-                    val frontModifier = Modifier
-                        .fillMaxWidth(0.93f)
-                        .height(160.dp)
-                        .graphicsLayer { translationX = dragX }
-
-                    if (front == null) {
-                        AddCard(frontModifier, onClick = { adding = true })
                     } else {
-                        CardFace(
-                            site = front,
-                            modifier = frontModifier.pointerInput(front.url) {
-                                detectTapGestures(
-                                    onTap = { onOpen(front.url) },
-                                    onLongPress = { editing = front },
-                                )
-                            },
+                        // Previous card: the bottom card slides away to the right,
+                        // and the previous site drops in over the untouched front.
+                        StackCard(
+                            site = deck.getOrNull((index + 2) % count),
+                            frac = lowFrac,
+                            x = p * w,
+                            y = lowY,
+                            alpha = if (p > 0.85f) ((1f - p) / 0.15f) else 1f,
+                        )
+                        StackCard(
+                            site = deck.getOrNull((index + 1) % count),
+                            frac = midFrac,
+                            x = 0f,
+                            y = midY,
+                            alpha = 0.95f,
+                        )
+                        val frontModifier = Modifier
+                            .fillMaxWidth(frontFrac)
+                            .height(160.dp)
+                        if (front == null) {
+                            AddCard(frontModifier, onClick = { adding = true })
+                        } else {
+                            CardFace(
+                                site = front,
+                                modifier = frontModifier.pointerInput(front.url) {
+                                    detectTapGestures(
+                                        onTap = { onOpen(front.url) },
+                                        onLongPress = { editing = front },
+                                    )
+                                },
+                            )
+                        }
+                        val incoming = deck.getOrNull((index - 1 + count) % count)
+                        StackCard(
+                            site = incoming,
+                            frac = frontFrac,
+                            x = -(1f - p) * w,
+                            y = 0.dp,
+                            alpha = 1f,
                         )
                     }
                 }
@@ -497,6 +533,38 @@ private fun CardFace(site: QuickSite, modifier: Modifier = Modifier) {
     }
 }
 
+/**
+ * One non-interactive card of the stack. Only geometry is animated; the content
+ * stays put so the deck reads as physical cards sliding between slots.
+ */
+@Composable
+private fun StackCard(
+    site: QuickSite?,
+    frac: Float,
+    x: Float,
+    y: androidx.compose.ui.unit.Dp,
+    alpha: Float,
+) {
+    if (alpha < 0.02f) return
+    // The trailing "+" slot has no colour of its own; painting it would leak a
+    // grey rectangle out from under the stack.
+    val real = site ?: return
+    val dark = isSystemInDarkTheme()
+    val base = Color(FaviconColor.containerColor(real.color, dark))
+    Box(
+        Modifier
+            .fillMaxWidth(frac)
+            .height(160.dp)
+            .graphicsLayer {
+                translationX = x
+                translationY = y.toPx()
+                this.alpha = alpha
+            }
+            .clip(RoundedCornerShape(26.dp))
+            .background(base),
+    )
+}
+
 @Composable
 private fun BackCard(site: QuickSite?, modifier: Modifier = Modifier) {
     val scheme = MaterialTheme.colorScheme
@@ -513,9 +581,9 @@ private fun AddCard(modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .clip(RoundedCornerShape(26.dp))
-            .background(scheme.surfaceVariant.copy(alpha = 0.35f))
+            .background(scheme.surfaceVariant.copy(alpha = 0.5f))
             .border(
-                BorderStroke(2.dp, scheme.outlineVariant),
+                BorderStroke(3.dp, scheme.outlineVariant.copy(alpha = 0.9f)),
                 RoundedCornerShape(26.dp),
             )
             .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
