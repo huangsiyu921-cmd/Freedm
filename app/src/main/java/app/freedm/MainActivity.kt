@@ -336,7 +336,7 @@ private fun SlimBottomBar(current: Tab, onSelect: (Tab) -> Unit) {
             .fillMaxWidth()
             .background(scheme.surfaceContainer)
             .navigationBarsPadding()
-            .height(52.dp),
+            .height(56.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceEvenly,
     ) {
@@ -358,12 +358,14 @@ private fun SlimBottomBar(current: Tab, onSelect: (Tab) -> Unit) {
                     item.icon,
                     contentDescription = null,
                     tint = tint,
-                    modifier = Modifier.size(20.dp),
+                    modifier = Modifier.size(22.dp),
                 )
-                Spacer(Modifier.height(2.dp))
+                Spacer(Modifier.height(3.dp))
                 Text(
                     item.label,
-                    fontSize = 10.sp,
+                    // 11sp is the floor that still reads as a label on a phone;
+                    // 10sp looked like a caption and disappeared at a glance.
+                    fontSize = 11.sp,
                     color = tint,
                     fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
                 )

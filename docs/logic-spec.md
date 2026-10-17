@@ -1843,3 +1843,50 @@ adb pull /storage/emulated/0/Android/data/<applicationId>/files/logs/diag.log
 在 `Application.onCreate` 里 `Repo.init` + `Diag.init` —— 否则"只有服务被重启"的进程里
 `Repo` 根本没初始化，`pump()` 也无从谈起。`MainActivity` 不再重复初始化。
 
+---
+
+# 第 21 部分 · 视觉规范（Tokens）
+
+所有视觉常量来自 `ui/theme/Tokens.kt`；调用点写魔法值一次，界面就开始各长各的。
+
+## 21.1 四张表
+
+| 组 | 值 | 用在哪 |
+|---|---|---|
+| `Radius` | sm 12 / md 18 / lg 26 / pill 28 | 下载行 / 网格与输入 / 卡片 / 搜索框 |
+| `Space` | xs 6 / sm 10 / md 18 / lg 28 | 行内 / 卡片间距与下沉 / 大区块 |
+| `Elev` | card 10 / stackMid 5 / stackLow 2 | 前景卡 / 第二层 / 第三层 |
+| `Motion` | enter 220ms emphasized / settle spring(0.75,700) / unfold 280ms | 翻页 / 归位 / 展开 |
+
+## 21.2 卡片堆的层次
+
+- 位置：前景 0.94 / 第二层 0.90 / 第三层 0.86 宽，y 偏移 0 / 18 / 36dp。**每层 4%**；3% 看不出层次。
+- 深度靠"光从上方来"三件套：`shadow` 递减（10 → 5 → 2dp）+ 后层底色压暗（深色主题 13% / 24%，
+  浅色 6% / 12%）+ 1dp 白色高光边（深色 6%、浅色 30%）。
+- 位移单位是 **1.5 × 容器宽**：卡片居中且比容器窄，1 个容器宽不足以把圆角边移出屏幕。
+- 静止时"上一张卡"不绘制（`p > 0.001` 才画），否则会在侧边留一条残影。
+
+## 21.3 文字层级
+
+- 三档文字色：`onSurface` / `onSurfaceVariant` / 前者 85% alpha；两档字重 400 与 500–600。
+- 尺寸：底栏标签 11sp（下限）、下载行 14sp + 次标 11sp、卡片标题 26sp、网格 14sp、分组标题 labelLarge。
+
+## 21.4 进度条与对比度
+
+| 状态 | 行背景 | 文字 |
+|---|---|---|
+| 进行中 | `primary @ 30%`（tint，不是实色） | `onSurface` |
+| 已完成 | 实色 `primary` | `onPrimary` |
+| 失败 | `errorContainer` | `onSurface` + 错误文字用 `error` |
+
+进行中用实色 `primary` 会让深色文字压在饱和蓝上，对比度不足；tint 之后文字在填充区与空白区都够读。
+
+## 21.5 空状态
+
+40dp 图标（`onSurfaceVariant @ 35%`）+ `titleMedium` 标题 + 一行 `bodySmall` 说明。
+只有文字的空状态读起来像出错。
+
+## 21.6 触控目标
+
+可见尺寸可以小，命中区不行：收起横条视觉 6dp、命中 32dp；底栏每格 1/3 屏宽 × 56dp。
+

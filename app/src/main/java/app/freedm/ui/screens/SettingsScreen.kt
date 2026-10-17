@@ -499,8 +499,18 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
 
             item { GroupTitle("关于") }
             item {
+                // Read the version from the package instead of hard-coding it: the
+                // last hard-coded one said 0.1.0 two releases later.
+                val version = remember {
+                    runCatching {
+                        ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
+                    }.getOrNull().orEmpty()
+                }
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp)) {
-                    Text("FreeDM 0.1.0", style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        if (version.isBlank()) "FreeDM" else "FreeDM $version",
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
                     Spacer(Modifier.height(4.dp))
                     Text(
                         "开源下载管理器，GPL-3.0",

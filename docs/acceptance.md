@@ -232,6 +232,16 @@ adb shell cat /storage/emulated/0/Android/data/com.huangsy.freedm.dev/files/logs
 
 事件表与取日志方法见 `docs/logic-spec.md` §19。
 
+### B6 视觉一致性 — `PASS`
+
+判定（真机截图比对，规则见 `logic-spec.md` §21）：
+1. 卡片堆三层可见：阴影递减 + 后层更暗；左右翻页后**两侧无残影**。
+2. 底栏图标 22dp、标签 11sp，三个 tab 等宽；卡片 26dp、网格 18dp、下载行 12dp 圆角各归其位。
+3. 下载页空状态：40dp 淡图标 + 标题 + 一行说明。
+4. 设置 → 关于的版本号来自包信息（debug 显示 `0.1.2-dev`）。
+
+实测（荣耀 MAA-AN00 / Android 16）：卡片堆层次与翻页残影修复、网格展开、空状态、版本号均符合。
+
 ---
 
 ## C. 隐私基线

@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -56,9 +57,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
@@ -75,6 +82,10 @@ import app.freedm.data.QuickSite
 import app.freedm.data.Repo
 import app.freedm.data.SiteStore
 import app.freedm.engine.Prober
+import app.freedm.ui.theme.Elev
+import app.freedm.ui.theme.Motion
+import app.freedm.ui.theme.Radius
+import app.freedm.ui.theme.Space
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -158,12 +169,14 @@ fun StartPage(
 
     fun flip(direction: Int) {
         scope.launch {
-            val w = cardWidth.floatValue
+            // 1.5 container widths, not 1: the outgoing card is narrower than the
+            // container and sits centred, so a single width leaves a sliver of its
+            // rounded edge visible at the side.
+            val travel = cardWidth.floatValue * 1.5f
             animate(
                 dragX,
-                -direction * w,
-                // Material's emphasized-decelerate: starts brisk, lands softly.
-                animationSpec = tween(200, easing = CubicBezierEasing(0.05f, 0.7f, 0.1f, 1f)),
+                -direction * travel,
+                animationSpec = Motion.enter,
             ) { v: Float, _: Float -> dragX = v }
             index = ((index + direction) % count + count) % count
             // The neighbour card has already travelled to the centre, so reset
@@ -178,7 +191,7 @@ fun StartPage(
             animate(
                 unfold,
                 if (open) 1f else 0f,
-                animationSpec = tween(280, easing = FastOutSlowInEasing),
+                animationSpec = Motion.unfold,
             ) { v: Float, _: Float -> unfold = v }
         }
     }
@@ -241,7 +254,7 @@ fun StartPage(
                                         animate(
                                             dragX,
                                             0f,
-                                            animationSpec = spring(dampingRatio = 0.7f, stiffness = 900f),
+                                            animationSpec = Motion.settle(),
                                         ) { v: Float, _: Float -> dragX = v }
                                     }
                                 }
@@ -268,18 +281,23 @@ fun StartPage(
                     contentAlignment = Alignment.Center,
                 ) {
                     val w = cardWidth.floatValue
+                    // Drags are measured against 1.5 container widths: a card is
+                    // narrower than its container, so one width is not enough travel
+                    // to get a centred card fully off screen.
+                    val travel = w * 1.5f
                     // -1..0 = pulling the next card in, 0..1 = pulling the previous one.
-                    val pull = (dragX / w).coerceIn(-1f, 1f)
+                    val pull = (dragX / travel).coerceIn(-1f, 1f)
                     val forward = pull < 0f
                     val p = abs(pull)
 
                     // Geometry of a resting stack: each card below is narrower and
-                    // sits lower. Cards animate between these slots while dragging.
-                    val frontFrac = 0.93f
+                    // sits lower. 4% per step reads as a real stack; 3% was too
+                    // subtle to see at all.
+                    val frontFrac = 0.94f
                     val midFrac = 0.90f
-                    val lowFrac = 0.87f
-                    val midY = 18.dp
-                    val lowY = 36.dp
+                    val lowFrac = 0.86f
+                    val midY = Space.md
+                    val lowY = Space.md * 2
 
                     if (forward) {
                         // Next card: the card below rises into place while a fresh one
@@ -288,9 +306,10 @@ fun StartPage(
                         StackCard(
                             site = incoming,
                             frac = lowFrac,
-                            x = (1f - p) * w,
+                            x = (1f - p) * travel,
                             y = lowY,
                             alpha = 1f,
+                            depth = 2,
                         )
                         StackCard(
                             site = deck.getOrNull((index + 1) % count),
@@ -298,6 +317,7 @@ fun StartPage(
                             x = 0f,
                             y = androidx.compose.ui.unit.lerp(0.dp, midY, p),
                             alpha = androidx.compose.ui.util.lerp(1f, 0.95f, p),
+                            depth = 1,
                         )
                         val frontModifier = Modifier
                             .fillMaxWidth(frontFrac)
@@ -325,6 +345,7 @@ fun StartPage(
                             x = p * w,
                             y = lowY,
                             alpha = if (p > 0.85f) ((1f - p) / 0.15f) else 1f,
+                            depth = 2,
                         )
                         StackCard(
                             site = deck.getOrNull((index + 1) % count),
@@ -332,6 +353,7 @@ fun StartPage(
                             x = 0f,
                             y = midY,
                             alpha = 0.95f,
+                            depth = 1,
                         )
                         val frontModifier = Modifier
                             .fillMaxWidth(frontFrac)
@@ -349,14 +371,19 @@ fun StartPage(
                                 },
                             )
                         }
-                        val incoming = deck.getOrNull((index - 1 + count) % count)
-                        StackCard(
-                            site = incoming,
-                            frac = frontFrac,
-                            x = -(1f - p) * w,
-                            y = 0.dp,
-                            alpha = 1f,
-                        )
+                        // Only drawn while the previous card is actually coming in;
+                        // at rest it sits a full travel away and must not paint at all.
+                        if (p > 0.001f) {
+                            val incoming = deck.getOrNull((index - 1 + count) % count)
+                            StackCard(
+                                site = incoming,
+                                frac = frontFrac,
+                                x = -(1f - p) * travel,
+                                y = 0.dp,
+                                alpha = 1f,
+                                depth = 0,
+                            )
+                        }
                     }
                 }
             }
@@ -381,11 +408,12 @@ fun StartPage(
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
             // Unfolded: a grab bar that folds the grid back. Deck: page dots.
             if (unfold >= 0.25f) {
+                // The visual bar is 6dp tall, but the tap target must not be:
+                // wrap it in a 32dp-high box so folding back is not a pixel hunt.
                 Box(
                     Modifier
-                        .size(40.dp, 6.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.outlineVariant)
+                        .width(96.dp)
+                        .height(32.dp)
                         .pointerInput(Unit) {
                             detectTapGestures(
                                 onTap = {
@@ -393,13 +421,21 @@ fun StartPage(
                                         animate(
                                             unfold,
                                             0f,
-                                            animationSpec = tween(280, easing = FastOutSlowInEasing),
+                                            animationSpec = Motion.unfold,
                                         ) { v: Float, _: Float -> unfold = v }
                                     }
                                 },
                             )
                         },
-                )
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(
+                        Modifier
+                            .size(40.dp, 6.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+                }
             }
             if (unfold < 0.25f) {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -407,7 +443,7 @@ fun StartPage(
                         val active = i == index % count
                         val w by animateDpAsState(
                             targetValue = if (active) 18.dp else 6.dp,
-                            animationSpec = spring(dampingRatio = 0.7f, stiffness = 700f),
+                            animationSpec = Motion.settle(),
                             label = "dot",
                         )
                         Box(
@@ -465,7 +501,7 @@ private fun SearchField(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val focusManager = LocalFocusManager.current
-    val shape = RoundedCornerShape(28.dp)
+    val shape = RoundedCornerShape(Radius.pill)
 
     Row(
         Modifier
@@ -473,8 +509,9 @@ private fun SearchField(
             .heightIn(min = 64.dp)
             .clip(shape)
             .background(scheme.surfaceVariant.copy(alpha = 0.45f))
+            // A 1dp idle border keeps the field quiet; only focus earns the weight.
             .border(
-                width = 2.dp,
+                width = if (focused) 2.dp else 1.dp,
                 color = if (focused) scheme.primary else scheme.outlineVariant,
                 shape = shape,
             )
@@ -526,11 +563,14 @@ private fun CardFace(site: QuickSite, modifier: Modifier = Modifier) {
     val dark = androidx.compose.foundation.isSystemInDarkTheme()
     val base = Color(FaviconColor.containerColor(site.color, dark))
     val content = Color(FaviconColor.onContainerColor(site.color, dark))
+    val shape = RoundedCornerShape(Radius.lg)
 
     Box(
         modifier
-            .clip(RoundedCornerShape(26.dp))
+            .shadow(Elev.card, shape, clip = false)
+            .clip(shape)
             .background(base)
+            .border(1.dp, Color.White.copy(alpha = if (dark) 0.06f else 0.30f), shape)
             .padding(22.dp),
     ) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
@@ -564,6 +604,7 @@ private fun StackCard(
     x: Float,
     y: androidx.compose.ui.unit.Dp,
     alpha: Float,
+    depth: Int,
 ) {
     if (alpha < 0.02f) return
     // The trailing "+" slot has no colour of its own; painting it would leak a
@@ -571,6 +612,14 @@ private fun StackCard(
     val real = site ?: return
     val dark = isSystemInDarkTheme()
     val base = Color(FaviconColor.containerColor(real.color, dark))
+    // Depth is read from light, not from colour alone: a card further back is
+    // darker and casts a smaller shadow than the one in front of it.
+    val shade = when (depth) {
+        2 -> if (dark) 0.24f else 0.12f
+        1 -> if (dark) 0.13f else 0.06f
+        else -> 0f
+    }
+    val shape = RoundedCornerShape(Radius.lg)
     Box(
         Modifier
             .fillMaxWidth(frac)
@@ -580,8 +629,22 @@ private fun StackCard(
                 translationY = y.toPx()
                 this.alpha = alpha
             }
-            .clip(RoundedCornerShape(26.dp))
-            .background(base),
+            .shadow(
+                elevation = when (depth) {
+                    2 -> Elev.stackLow
+                    1 -> Elev.stackMid
+                    else -> Elev.card
+                },
+                shape = shape,
+                clip = false,
+            )
+            .clip(shape)
+            .background(if (shade > 0f) lerp(base, Color.Black, shade) else base)
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = if (dark) 0.06f else 0.30f),
+                shape = shape,
+            ),
     )
 }
 
@@ -598,14 +661,30 @@ private fun BackCard(site: QuickSite?, modifier: Modifier = Modifier) {
 @Composable
 private fun AddCard(modifier: Modifier = Modifier, onClick: () -> Unit) {
     val scheme = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(Radius.lg)
     Box(
         modifier
-            .clip(RoundedCornerShape(26.dp))
-            .background(scheme.surfaceVariant.copy(alpha = 0.5f))
-            .border(
-                BorderStroke(3.dp, scheme.outlineVariant.copy(alpha = 0.9f)),
-                RoundedCornerShape(26.dp),
-            )
+            .clip(shape)
+            .background(scheme.surfaceVariant.copy(alpha = 0.35f))
+            // Dashed, not solid: an empty slot should look like an opening, and a
+            // solid outline reads as a filled card that happens to be pale.
+            .drawWithCache {
+                val stroke = Stroke(
+                    width = 2.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(
+                        floatArrayOf(9.dp.toPx(), 7.dp.toPx()),
+                    ),
+                )
+                val radius = CornerRadius(Radius.lg.toPx())
+                onDrawWithContent {
+                    drawContent()
+                    drawRoundRect(
+                        color = scheme.outlineVariant,
+                        cornerRadius = radius,
+                        style = stroke,
+                    )
+                }
+            }
             .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
         contentAlignment = Alignment.Center,
     ) {
@@ -613,7 +692,7 @@ private fun AddCard(modifier: Modifier = Modifier, onClick: () -> Unit) {
             Icons.Default.Add,
             contentDescription = "添加快捷方式",
             tint = scheme.onSurfaceVariant,
-            modifier = Modifier.size(34.dp),
+            modifier = Modifier.size(30.dp),
         )
     }
 }
@@ -673,7 +752,7 @@ private fun GridCell(
     Box(
         modifier
             .height(64.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(base)
             .pointerInput(site.url) {
                 detectTapGestures(onTap = { onClick() }, onLongPress = { onLongClick() })
@@ -698,7 +777,7 @@ private fun AddCell(modifier: Modifier, onClick: () -> Unit) {
     Box(
         modifier
             .height(64.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(Radius.md))
             .background(scheme.surfaceVariant.copy(alpha = 0.5f))
             .pointerInput(Unit) { detectTapGestures(onTap = { onClick() }) },
         contentAlignment = Alignment.Center,

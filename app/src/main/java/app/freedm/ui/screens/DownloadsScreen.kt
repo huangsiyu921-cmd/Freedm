@@ -81,6 +81,8 @@ import app.freedm.ui.components.SegmentProgressBar
 import app.freedm.ui.firstUrl
 import app.freedm.ui.formatBytes
 import app.freedm.ui.formatEta
+import app.freedm.ui.theme.Radius
+import app.freedm.ui.theme.Space
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -289,6 +291,15 @@ private fun persistedPercents(t: DownloadTask, segs: List<Segment>?): List<Float
 private fun EmptyState(filter: Filter) {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            // An empty screen with only text reads as a bug; a dimmed glyph gives it
+            // an anchor without competing with the one action that matters.
+            Icon(
+                painter = painterResource(R.drawable.ic_file),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f),
+                modifier = Modifier.size(40.dp),
+            )
+            Spacer(Modifier.height(Space.sm))
             Text(
                 when (filter) {
                     Filter.ALL -> "还没有下载任务"
@@ -299,7 +310,7 @@ private fun EmptyState(filter: Filter) {
                 style = MaterialTheme.typography.titleMedium,
             )
             if (filter == Filter.ALL) {
-                Spacer(Modifier.height(6.dp))
+                Spacer(Modifier.height(Space.xs))
                 Text(
                     "点右下角 + 新建，或从浏览器分享链接过来",
                     style = MaterialTheme.typography.bodySmall,
@@ -330,9 +341,11 @@ private fun TaskCard(
     val failed = task.state == TaskState.FAILED
     val progressColor = when {
         failed -> MaterialTheme.colorScheme.errorContainer
-        // Same colour whether running or finished, so a full row reads as the
-        // progression of the same bar rather than a different state colour.
-        else -> MaterialTheme.colorScheme.primary
+        // Finished rows are a solid block; running rows are a tint. Text stays
+        // onSurface while transferring, so it keeps its contrast on both the filled
+        // and the empty part of the bar instead of going dark-on-blue.
+        done -> MaterialTheme.colorScheme.primary
+        else -> MaterialTheme.colorScheme.primary.copy(alpha = 0.30f)
     }
     val onTop = if (done) MaterialTheme.colorScheme.onPrimary
     else MaterialTheme.colorScheme.onSurface
@@ -340,7 +353,7 @@ private fun TaskCard(
     Box(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(Radius.sm))
             .heightIn(min = 64.dp),
     ) {
         // Progress is the row background, not a separate strip.
