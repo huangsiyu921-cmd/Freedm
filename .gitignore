@@ -1,0 +1,19 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# 本机配置（含 SDK 绝对路径）
+local.properties
+
+# IDE
+.idea/
+*.iml
+captures/
+.externalNativeBuild
+.cxx
+
+# 系统
+.DS_Store
+Thumbs.db

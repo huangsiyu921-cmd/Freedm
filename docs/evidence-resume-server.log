@@ -1,0 +1,276 @@
+﻿serving 52428800 bytes on 0.0.0.0:8000
+sha256=624bbe3f61588f97cfaad1af50360bb8c5fc94774d3c15dbf471dcd42b9bea8e
+etag="fde0d2844a6706bb4f8a1fb616750f06"
+throttle=300000 B/s
+HEAD  from=127.0.0.1  (full=52428800)
+GET   from=127.0.0.1  Range=bytes=0-8738133  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 0-8738133/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=17476268-26214401  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 17476268-26214401/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=8738134-17476267  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 8738134-17476267/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=43690670-52428799  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 43690670-52428799/52428800 (8738130 B)
+GET   from=127.0.0.1  Range=bytes=34952536-43690669  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 34952536-43690669/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=26214402-34952535  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 26214402-34952535/52428800 (8738134 B)
+python.exe : ----------------------------------------
+所在位置 行:2 字符: 1
++ & $py "D:\1DM+\tools\range_server.py" 52428800 8000 --slow=300000 *>  ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (----------------------------------------:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Exception occurred during processing of request from ('127.0.0.1', 52097)
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52099)
+Exception occurred during processing of request from ('127.0.0.1', 52098)
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52101)
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52102)
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52100)
+Traceback (most recent call last):
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\python 3.12\Lib\http\server.py", line 438, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+----------------------------------------
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+----------------------------------------
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+----------------------------------------
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+----------------------------------------
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+HEAD  from=127.0.0.1  (full=52428800)
+GET   from=127.0.0.1  Range=bytes=0-8738133  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 0-8738133/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=26214402-34952535  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 26214402-34952535/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=34952536-43690669  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 34952536-43690669/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=8738134-17476267  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 8738134-17476267/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=17476268-26214401  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 17476268-26214401/52428800 (8738134 B)
+GET   from=127.0.0.1  Range=bytes=43690670-52428799  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 43690670-52428799/52428800 (8738130 B)
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 53683)
+Traceback (most recent call last):
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 438, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 53685)
+Traceback (most recent call last):
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 53686)
+Traceback (most recent call last):
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+----------------------------------------
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+Exception occurred during processing of request from ('127.0.0.1', 53684)
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+Traceback (most recent call last):
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 53687)
+Traceback (most recent call last):
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 53688)
+Traceback (most recent call last):
+  File "D:\python 3.12\Lib\socketserver.py", line 697, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\python 3.12\Lib\socketserver.py", line 362, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "D:\python 3.12\Lib\socketserver.py", line 766, in __init__
+    self.handle()
+  File "D:\python 3.12\Lib\http\server.py", line 436, in handle
+    self.handle_one_request()
+  File "D:\python 3.12\Lib\http\server.py", line 424, in handle_one_request
+    method()
+  File "D:\1DM+\tools\range_server.py", line 105, in do_GET
+    self.wfile.write(payload[off:off + chunk])
+  File "D:\python 3.12\Lib\socketserver.py", line 845, in write
+    self._sock.sendall(b)
+ConnectionAbortedError: [WinError 10053] ��������е������ֹ��һ���ѽ��������ӡ�
+----------------------------------------
+GET   from=127.0.0.1  Range=bytes=2949120-8738133  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 2949120-8738133/52428800 (5789014 B)
+GET   from=127.0.0.1  Range=bytes=20425388-26214401  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 20425388-26214401/52428800 (5789014 B)
+GET   from=127.0.0.1  Range=bytes=11687254-17476267  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 11687254-17476267/52428800 (5789014 B)
+GET   from=127.0.0.1  Range=bytes=37901656-43690669  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 37901656-43690669/52428800 (5789014 B)
+GET   from=127.0.0.1  Range=bytes=46639790-52428799  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 46639790-52428799/52428800 (5789010 B)
+GET   from=127.0.0.1  Range=bytes=29163522-34952535  If-Range="fde0d2844a6706bb4f8a1fb616750f06"
+      -> 206 bytes 29163522-34952535/52428800 (5789014 B)

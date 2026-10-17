@@ -1,0 +1,229 @@
+# 已知坑与设计权衡
+
+全部是本次实现/联调中**真实撞到**的问题，按"现象 → 原因 → 处理"记录。
+写着是为了不再踩第二遍，不是为了凑篇幅。
+
+---
+
+## 1. 分片进度不落库，续传会回退到段首（最严重）
+
+**现象**：进程被杀后重启，下载"续传"了，但服务器看到每段请求又从头开始，总下载量是文件的两倍。
+
+**原因**：只把任务级总量 `download.downloaded` 写进了 DB，`segment.downloaded` 一直是 0。
+续传时读的是 `segment.downloaded`，于是每段都从 `start_byte` 重新下。
+
+**处理**：每个 segment 持有一个 `AtomicLong` 作为续传锚点，ticker 每 1 秒把**每段**的偏移写库：
+
+```kotlin
+val segProgress = plan.associateWith { AtomicLong(it.downloaded) }
+// ticker 内
+if (now - lastSegFlush >= 1000) {
+    plan.forEach { seg ->
+        Repo.markSegment(id, seg.index, segProgress.getValue(seg).get(), TaskState.RUNNING)
+    }
+}
+```
+
+**注意**：任务级与分片级刷新频率不同（500 ms vs 1000 ms），所以
+`download.downloaded` 会比 `sum(segment.downloaded)` 略微超前——这是正常的，两者用途不同，
+**续传只看 segment**。
+
+---
+
+## 2. 重试导致进度重复累加，进度条能超过 100%
+
+**现象**：网络抖动后任务显示 120% 进度，`download.downloaded` 大于文件大小。
+
+**原因**：重试时从段首重下，而进度计数器又把这段字节加了一遍：
+
+```kotlin
+// 错误写法
+val from = seg.startByte + seg.downloaded   // seg 是快照，重试时不变
+counter.addAndGet(delta)                     // 重复计数
+```
+
+**处理**：进度锚点必须跨重试保留，且只上报**真实新增**字节：
+
+```kotlin
+val from = seg.startByte + written.get()     // written 是 AtomicLong，跨重试单调递增
+written.addAndGet(n.toLong())
+onBytes(n.toLong())                          // 只在真正读到新数据时调用
+```
+
+---
+
+## 3. 预分配文件使"文件大小"无法用于判断进度
+
+**现象**：下载到 30% 时 `ls -l` 显示文件已经是完整大小。
+
+**原因**：为了让各段能自由 `seek`，开头就 `raf.setLength(totalBytes)` 预分配了。
+
+**处理**：判断进度只能看 DB 里的 `segment.downloaded` / `download.downloaded`。
+想从文件系统侧看实际落盘量，用 `du`（块占用）而不是 `ls -l`（逻辑大小）。
+
+---
+
+## 4. 服务器忽略 `Range` 时必须报错，不能照写
+
+**现象**：某些 CDN 对带 `Range` 的请求返回 `200` + 完整 body。
+
+**风险**：若把完整 body 写到 `start_byte + 已下载` 的偏移处，文件会被**静默写坏**，
+而且大小检查还能通过（因为预分配过）。
+
+**处理**：只要是"续传请求"（起点不等于段首），就要求响应必须是 `206`，否则抛错重试：
+
+```kotlin
+if (rangedRequest && from > seg.startByte && code != 206) {
+    throw IOException("服务器未按 Range 返回（HTTP $code）")
+}
+```
+
+---
+
+## 5. 短读不会抛异常，必须自己判长度
+
+**现象**：连接被中间设备掐断，`InputStream.read` 正常返回 -1，没有异常。
+
+**处理**：读完一段后校验实际字节数，短了就当成失败丢给重试循环：
+
+```kotlin
+if (expected >= 0 && written.get() < expected) {
+    throw IOException("连接提前结束（${written.get()}/$expected）")
+}
+```
+
+---
+
+## 6. `HEAD` 不一定被支持，探测要能回退
+
+**现象**：部分静态托管/CDN 直接拒绝 `HEAD`（返回 403/405）。
+
+**处理**：`HEAD` 失败时退回 `GET` + `Range: bytes=0-0`，并从 `Content-Range`
+的 `bytes 0-0/TOTAL` 里取总大小：
+
+```kotlin
+val total = contentRange.substringAfterLast('/', "-").trim().toLongOrNull() ?: -1L
+```
+
+---
+
+## 7. 续传校验用 `If-Range` + `ETag`，不要用时间戳
+
+**处理**：首次探测记下 `ETag`（优先）/ `Last-Modified`；之后每次请求带
+`If-Range: <ETag>`。服务器在资源变化时会直接回 `200` 全量，配合第 4 条就能安全丢弃旧数据。
+另外启动时若发现 `ETag`/总大小与落库不一致，主动删文件重建分片计划。
+
+---
+
+## 8. `RandomAccessFile` 的并发写必须加锁
+
+多个段协程共享同一个 `RandomAccessFile`。`seek` + `write` 不是原子操作，
+不加锁会互相踩偏移：
+
+```kotlin
+synchronized(raf) {
+    raf.seek(pos)
+    raf.write(buf, 0, n)
+}
+```
+
+（锁的粒度是写一次 64 KiB，实测 6 并发段 + 50 MB 文件 sha256 完全正确。）
+
+---
+
+## 9. `RUNNING` 与 `PAUSED` 必须能区分，否则自动恢复会误伤
+
+**原因**：如果用同一个状态表示"没在跑"，重启后就无法判断该不该自动继续。
+
+**处理**：
+- 进程被杀 → 任务仍留在 `RUNNING`
+- 用户主动暂停 → `PAUSED`
+- 启动时 `UPDATE ... SET state='QUEUED' WHERE state='RUNNING'`
+
+这样"自动恢复"只恢复前者。
+
+---
+
+## 10. `MediaStore` 不能随机访问 → 只能"先下后导出"
+
+**原因**：分段下载需要 `RandomAccessFile.seek`，而 MediaStore 只提供顺序输出流。
+
+**处理**：数据一律先落在应用私有目录，完成后**复制**到 `MediaStore.Downloads`
+（写入用 `IS_PENDING=1` → 写完置 0），导出成功才删私有副本。
+失败时保留私有副本，任务仍可续传。
+
+---
+
+## 11. 剪贴板只有前台能读
+
+**现象**：`getPrimaryClip()` 在后台抛 `SecurityException`（Android 10+）。
+
+**处理**：`ClipboardWatcher` 只在 `onResume` 注册、`onPause` 注销，读取整体包在
+`runCatching` 里。默认关闭，用户开启才注册。
+
+---
+
+## 12. 用 PowerShell 从设备拉二进制会被改坏
+
+**现象**：`adb shell run-as ... cat file.db | Out-File db.bin` 得到的文件
+`sqlite3 connect` 报 `file is not a database`（只剩 51 字节）。
+
+**原因**：PowerShell 的文本管道会按字符集转码。
+
+**处理**：走 `exec-out` 并交给 `cmd` 做字节重定向：
+
+```powershell
+cmd /c "adb -s emulator-5556 exec-out run-as app.freedm cat databases/downloads.db > db.bin"
+```
+
+顺带一个坑：`SQLiteOpenHelper` 的库在 **`databases/`** 目录，不是 `files/`。
+
+---
+
+## 13. 直接改 `shared_prefs` 必须 `force-stop`
+
+SharedPreferences 在进程启动时读入内存并缓存，改完文件不重启进程不会生效。
+脚本化改设置时顺序必须是：`force-stop` → 改文件 → `am start`。
+
+---
+
+## 14. 明文 HTTP 在模拟器上的处理
+
+Android 默认禁明文，而宿主机测试源是 `http://10.0.2.2:8000`。
+
+**处理**：只在 **debug** source set 放 `network_security_config`，且白名单只有
+`10.0.2.2 / localhost / 127.0.0.1`；release 保持 `cleartextTrafficPermitted=false`。
+不要把这条放宽到 release。
+
+---
+
+## 15. `WebView.evaluateJavascript` 的返回值是"二次编码"的
+
+**现象**：注入脚本里 `return JSON.stringify(list)`，Kotlin 侧拿到的是 `"\"[{\\\"u\\\":...}]\""`
+——一个 JSON 字符串字面量，直接 `JSONArray(raw)` 会解析失败。
+
+**原因**：`evaluateJavascript` 把 JS 返回值再 JSON 编码一次传给 `ValueCallback`。
+
+**处理**：先当 JSON 字符串解一层，再解数组：
+
+```kotlin
+val inner = if (raw.startsWith("\"")) JSONObject("{\"v\":$raw}").getString("v") else raw
+val arr = JSONArray(inner)
+```
+
+---
+
+## 16. 导出到公共目录后 `filePath` 会失效
+
+**现象**：开启"保存到公共下载目录"后，已完成列表里所有文件显示 `0 B`。
+
+**原因**：`Exporter` 成功后删掉了私有副本，而 DB 里的 `dir_path/file_name` 仍指向它。
+`File.length()` 对不存在的文件返回 0 且**不抛异常**，所以 `runCatching` 兜不住。
+
+**处理**：读取大小时先判 `exists()`：
+
+```kotlin
+val size = if (f.exists()) f.length() else t.totalBytes
+```
+
+**更彻底的做法**（未实现）：导出成功后把新的 `content://` URI 记进 DB，列表与打开都走它。
