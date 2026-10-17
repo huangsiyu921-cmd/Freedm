@@ -19,16 +19,33 @@ data class QuickSite(
 object SiteStore {
 
     private const val KEY = "quick_sites"
+    /** One-shot flag: the seed list below was replaced, so stored sites get reset. */
+    private const val KEY_SEED_V2 = "quick_sites_seed_v2"
 
-    /** Seeds the list on first run only; afterwards the user owns it. */
+    /**
+     * Seeds the list on first run (and once after the seed changed). Order is the
+     * user's, and so are the tints: a card whose icon cannot be fetched should
+     * still look like the site.
+     */
     val defaults = listOf(
         QuickSite("百度", "https://www.baidu.com", 0xFF2A3DE0.toInt()),
         QuickSite("Bing", "https://cn.bing.com", 0xFF008373.toInt()),
-        QuickSite("哔哩哔哩", "https://m.bilibili.com", 0xFFFB7299.toInt()),
-        QuickSite("知乎", "https://www.zhihu.com", 0xFF0084FF.toInt()),
         QuickSite("GitHub", "https://github.com", 0xFF24292F.toInt()),
-        QuickSite("豆瓣", "https://m.douban.com", 0xFF2E963D.toInt()),
+        QuickSite("FreeDM", "https://github.com/huangsiyu921-cmd/Freedm", 0xFF2F6FEB.toInt()),
+        QuickSite("bilibili", "https://m.bilibili.com", 0xFFFB7299.toInt()),
+        QuickSite("Gmail", "https://mail.google.com", 0xFFEA4335.toInt()),
+        QuickSite("Apple Music", "https://music.apple.com", 0xFFFA243C.toInt()),
     )
+
+    /**
+     * Replaces whatever is stored with [defaults], once. The seed list is a user
+     * decision, so a stale list from an older build is not merged — it is dropped.
+     */
+    fun migrateSeed(prefs: SharedPreferences) {
+        if (prefs.getBoolean(KEY_SEED_V2, false)) return
+        prefs.edit().putBoolean(KEY_SEED_V2, true).apply()
+        save(prefs, defaults)
+    }
 
     fun load(prefs: SharedPreferences): List<QuickSite> {
         val raw = prefs.getString(KEY, null) ?: return defaults

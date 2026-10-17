@@ -63,6 +63,7 @@ import app.freedm.ui.ShareBus
 import app.freedm.ui.firstUrl
 import app.freedm.ui.screens.BrowseScreen
 import app.freedm.ui.screens.DownloadsScreen
+import app.freedm.ui.screens.HistoryScreen
 import app.freedm.ui.screens.PrivacyScreen
 import app.freedm.ui.screens.SettingsScreen
 import app.freedm.ui.screens.SiteDataScreen
@@ -241,6 +242,7 @@ private fun AppRoot(scope: CoroutineScope) {
     var detailId by remember { mutableStateOf<Long?>(null) }
     var showPrivacy by remember { mutableStateOf(false) }
     var showSiteData by remember { mutableStateOf(false) }
+    var showHistory by remember { mutableStateOf(false) }
 
     // A link shared in from another app (or the clipboard watcher) must land on
     // the download tab, otherwise the sheet never composes and the link is lost.
@@ -259,7 +261,12 @@ private fun AppRoot(scope: CoroutineScope) {
     BackHandler(enabled = detailId != null) { detailId = null }
     BackHandler(enabled = showPrivacy) { showPrivacy = false }
     BackHandler(enabled = showSiteData) { showSiteData = false }
+    BackHandler(enabled = showHistory) { showHistory = false }
 
+    if (showHistory) {
+        HistoryScreen(onBack = { showHistory = false })
+        return
+    }
     if (showSiteData) {
         SiteDataScreen(onBack = { showSiteData = false })
         return
@@ -287,7 +294,7 @@ private fun AppRoot(scope: CoroutineScope) {
                 DownloadsScreen(scope = scope, onOpenDetail = { detailId = it })
             }
             TabHost(visible = tab == Tab.BROWSE, index = 1) {
-                BrowseScreen()
+                BrowseScreen(onOpenHistory = { showHistory = true })
             }
             TabHost(visible = tab == Tab.SETTINGS, index = 2) {
                 SettingsScreen(

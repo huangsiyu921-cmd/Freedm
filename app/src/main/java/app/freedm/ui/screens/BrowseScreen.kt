@@ -73,6 +73,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -93,12 +94,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import app.freedm.browser.AdBlocker
 import app.freedm.browser.SniffedMedia
 import app.freedm.browser.Sniffer
+import app.freedm.data.HistoryStore
 import app.freedm.data.Repo
 import app.freedm.diag.Diag
 import app.freedm.engine.Engine
 import app.freedm.engine.FileNamer
 import app.freedm.engine.Prober
 import app.freedm.service.DownloadService
+import app.freedm.ui.BrowserBus
 import app.freedm.ui.formatBytes
 import app.freedm.ui.firstUrl
 import kotlinx.coroutines.Dispatchers
@@ -134,8 +137,21 @@ private fun looksLikeDownload(url: String): Boolean {
 private fun httpOnly(url: String?): String? =
     url?.takeIf { it.startsWith("http://") || it.startsWith("https://") }
 
-/** One browser tab: only the address and title are kept. */
-private data class TabEntry(val url: String, val title: String)
+/**
+ * One browser tab: address, title, and its own history.
+ *
+ * The history is kept here, not in the WebView, because the app runs a single
+ * WebView for all tabs — using the WebView's back/forward list meant every tab
+ * shared one history, so going back in tab 2 could land on a page from tab 1.
+ */
+private data class TabEntry(
+    val url: String,
+    val title: String,
+    /** Pages visited in this tab, oldest first. */
+    val history: List<String> = emptyList(),
+    /** Index into [history] of the page on screen; -1 for a fresh tab. */
+    val cursor: Int = -1,
+)
 
 /**
  * Desktop mode needs more than a desktop UA: sites with responsive CSS still lay
@@ -162,7 +178,7 @@ private const val MAX_SNIFFED = 400
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun BrowseScreen() {
+fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
     val ctx = LocalContext.current
     val prefs = remember { Repo.prefs() }
     val scope = rememberCoroutineScope()
@@ -170,8 +186,6 @@ fun BrowseScreen() {
 
     var address by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(0f) }
-    var canGoBack by remember { mutableStateOf(false) }
-    var canGoForward by remember { mutableStateOf(false) }
     val media = remember { mutableStateListOf<SniffedMedia>() }
     val selected = remember { mutableStateListOf<String>() }
     var showMedia by remember { mutableStateOf(false) }
@@ -189,7 +203,20 @@ fun BrowseScreen() {
                 val arr = org.json.JSONArray(prefs.getString("browser_tabs", null) ?: "[]")
                 for (i in 0 until arr.length()) {
                     val o = arr.getJSONObject(i)
-                    list.add(TabEntry(o.optString("url"), o.optString("title")))
+                    val hist = o.optJSONArray("history")?.let { h ->
+                        (0 until h.length()).map { idx -> h.optString(idx) }
+                    }.orEmpty()
+                    list.add(
+                        TabEntry(
+                            url = o.optString("url"),
+                            title = o.optString("title"),
+                            history = hist,
+                            cursor = o.optInt(
+                                "cursor",
+                                if (hist.isEmpty()) -1 else hist.lastIndex,
+                            ),
+                        ),
+                    )
                 }
             }
             if (list.isEmpty()) list.add(TabEntry("", ""))
@@ -202,6 +229,20 @@ fun BrowseScreen() {
     var findOpen by remember { mutableStateOf(false) }
     var findQuery by remember { mutableStateOf("") }
 
+    // Back/forward come from the tab's own history, so they are derived, not
+    // mirrored from the WebView (which only knows about one global stack).
+    val activeEntry = tabs.getOrNull(activeTab)
+    val canGoBack = !showStart && (activeEntry?.history?.isNotEmpty() == true)
+    val canGoForward = !showStart &&
+        activeEntry != null && activeEntry.cursor < activeEntry.history.lastIndex
+
+    // WebView's own UA, not the download one, and with the `; wv` marker stripped:
+    // that marker tells sites "this is an embedded WebView", and Bing answers it
+    // with a stripped page that renders as a single background image.
+    val defaultUa = remember {
+        android.webkit.WebSettings.getDefaultUserAgent(ctx).replace("; wv", "")
+    }
+
     fun persistTabs() {
         runCatching {
             val arr = org.json.JSONArray()
@@ -210,6 +251,8 @@ fun BrowseScreen() {
                     org.json.JSONObject().apply {
                         put("url", t.url)
                         put("title", t.title)
+                        put("cursor", t.cursor)
+                        put("history", org.json.JSONArray().also { h -> t.history.forEach(h::put) })
                     },
                 )
             }
@@ -220,8 +263,10 @@ fun BrowseScreen() {
         }
     }
     var sourceText by remember { mutableStateOf<String?>(null) }
-    var historyOpen by remember { mutableStateOf(false) }
-    var historyItems by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+    // True between an explicit navigation and the page it lands on. Redirects call
+    // `onPageFinished` again with a different URL, and those must replace the entry
+    // instead of stacking — otherwise 返回 lands on the same page's redirect.
+    var freshNav by remember { mutableStateOf(false) }
 
     var showCookies by remember { mutableStateOf(false) }
     var snifferEnabled by remember { mutableStateOf(prefs.getBoolean("sniff", true)) }
@@ -239,6 +284,10 @@ fun BrowseScreen() {
     // Per-page counters for the diagnostic log (see docs/logic-spec.md §20).
     val pageStartedAt = remember { AtomicLong(0) }
     val sniffNetCount = remember { AtomicLong(0) }
+    // Every subresource request for the current page, sniffed or not. This is the
+    // number that tells whether a page loaded its CSS/JS at all — a "finished in
+    // 89 ms with res=2" page is one that rendered almost nothing.
+    val resCount = remember { AtomicLong(0) }
     val blockedAtStart = remember { AtomicLong(0) }
     val lastDrainLogAt = remember { AtomicLong(0) }
 
@@ -262,6 +311,7 @@ fun BrowseScreen() {
             engine + java.net.URLEncoder.encode(text, "UTF-8")
         }
         showStart = false
+        freshNav = true
         webView?.loadUrl(target)
     }
 
@@ -271,13 +321,69 @@ fun BrowseScreen() {
         media.clear()
         findOpen = false
         showStart = true
+        // The tab becomes a blank tab again. Keeping the old address is what made
+        // the tab list show the page the user just backed out of, and the next
+        // launch reopen it.
+        val cur = tabs.getOrNull(activeTab)
+        if (cur != null && (cur.url.isNotEmpty() || cur.title.isNotEmpty() || cur.history.isNotEmpty())) {
+            tabs[activeTab] = TabEntry("", "")
+            persistTabs()
+        }
+    }
+
+    /** Loads one entry of the active tab's own history and moves its cursor there. */
+    fun openHistoryAt(index: Int) {
+        val cur = tabs.getOrNull(activeTab) ?: return
+        val target = cur.history.getOrNull(index) ?: return
+        tabs[activeTab] = cur.copy(cursor = index)
+        persistTabs()
+        showStart = false
+        address = target
+        webView?.loadUrl(target)
+    }
+
+    /** Back inside this tab's history; past the first page it returns to the start page. */
+    fun goBackSmart() {
+        val cur = tabs.getOrNull(activeTab)
+        if (cur != null && cur.cursor > 0) openHistoryAt(cur.cursor - 1)
+        else if (!showStart) showStartPage()
+    }
+
+    fun goForwardSmart() {
+        val cur = tabs.getOrNull(activeTab) ?: return
+        if (cur.cursor in 0 until cur.history.lastIndex) openHistoryAt(cur.cursor + 1)
+    }
+
+    /** Switching tabs reloads the page the tab was left on, from its own history. */
+    fun switchToTab(i: Int) {
+        val tab = tabs.getOrNull(i) ?: return
+        activeTab = i
+        persistTabs()
+        val target = httpOnly(tab.history.getOrNull(tab.cursor) ?: tab.url)
+        if (target == null) {
+            showStart = true
+            address = ""
+            webView?.loadUrl("about:blank")
+        } else {
+            showStart = false
+            address = target
+            webView?.loadUrl(target)
+        }
+    }
+
+    // The history page is a separate screen; it hands the row back through the bus.
+    val pendingOpen by BrowserBus.open.collectAsState()
+    LaunchedEffect(pendingOpen) {
+        val url = pendingOpen ?: return@LaunchedEffect
+        BrowserBus.consume()
+        navigate(url)
     }
 
     fun setDesktop(on: Boolean) {
         desktopUa = on
         prefs.edit().putBoolean("desktop_ua", on).apply()
         webView?.let {
-            it.settings.userAgentString = if (on) UA_DESKTOP else Prober.UA
+            it.settings.userAgentString = if (on) UA_DESKTOP else defaultUa
             // Re-request instead of reload: the UA decides what the server renders.
             val url = it.url
             if (url != null) it.loadUrl(url) else it.reload()
@@ -387,10 +493,10 @@ fun BrowseScreen() {
         return
     }
 
-    // Back closes the find bar first, then walks WebView history, then returns
+    // Back closes the find bar first, then walks this tab's history, then returns
     // to the start page. Only after that does the system leave the tab.
     BackHandler(enabled = findOpen) { findOpen = false }
-    BackHandler(enabled = canGoBack) { webView?.goBack() }
+    BackHandler(enabled = canGoBack) { goBackSmart() }
     BackHandler(enabled = !canGoBack && !showStart) { showStartPage() }
 
     Column(Modifier.fillMaxSize()) {
@@ -422,7 +528,7 @@ fun BrowseScreen() {
             // Back / forward stay visible and just grey out; hiding them made the
             // bar shift around and gave no hint that history existed.
             IconButton(
-                onClick = { webView?.goBack() },
+                onClick = { goBackSmart() },
                 enabled = canGoBack,
                 modifier = Modifier.size(40.dp),
             ) {
@@ -433,7 +539,7 @@ fun BrowseScreen() {
                 )
             }
             IconButton(
-                onClick = { webView?.goForward() },
+                onClick = { goForwardSmart() },
                 enabled = canGoForward,
                 modifier = Modifier.size(40.dp),
             ) {
@@ -528,16 +634,7 @@ fun BrowseScreen() {
                     }
                     MenuItem("浏览历史") {
                         menuOpen = false
-                        val list = webView?.copyBackForwardList()
-                        historyItems = if (list == null) {
-                            emptyList()
-                        } else {
-                            (0 until list.size).map { i ->
-                                val item = list.getItemAtIndex(i)
-                                (item.title ?: item.url ?: "") to (item.url ?: "")
-                            }
-                        }
-                        historyOpen = true
+                        onOpenHistory()
                     }
                     HorizontalDivider()
                     MenuItem(if (adblockOn) "☑ 广告过滤（已拦 $blockedCount）" else "☐ 广告过滤") {
@@ -683,7 +780,7 @@ fun BrowseScreen() {
                     WebView(c).apply {
                         settings.javaScriptEnabled = prefs.getBoolean("js_enabled", true)
                         settings.domStorageEnabled = true
-                        settings.userAgentString = if (desktopUa) UA_DESKTOP else Prober.UA
+                        settings.userAgentString = if (desktopUa) UA_DESKTOP else defaultUa
                         settings.loadWithOverviewMode = true
                         settings.useWideViewPort = true
                         // Follow the app theme instead of flashing a white page.
@@ -713,6 +810,19 @@ fun BrowseScreen() {
                             override fun onProgressChanged(view: WebView?, newProgress: Int) {
                                 loading = newProgress / 100f
                             }
+
+                            // The real source of a tab's title. Reading `view.title`
+                            // inside onPageFinished picks up the *previous* page's
+                            // title, which is how a tab ended up labelled
+                            // "about:blank" while showing music.apple.com.
+                            override fun onReceivedTitle(view: WebView?, title: String?) {
+                                val clean = title?.trim()
+                                if (clean.isNullOrEmpty() || clean == "about:blank") return
+                                val cur = tabs.getOrNull(activeTab) ?: return
+                                if (cur.url.isBlank() || cur.title == clean) return
+                                tabs[activeTab] = cur.copy(title = clean)
+                                persistTabs()
+                            }
                         }
 
                         webViewClient = object : WebViewClient() {
@@ -734,7 +844,12 @@ fun BrowseScreen() {
                                 }
                                 // Direct file links would otherwise navigate to a
                                 // page that renders as garbage; turn them into tasks.
-                                if (!looksLikeDownload(url)) return false
+                                if (!looksLikeDownload(url)) {
+                                    // A link the user followed is a new page in this
+                                    // tab's history, not a redirect of the current one.
+                                    freshNav = true
+                                    return false
+                                }
                                 startDownload(url)
                                 return true
                             }
@@ -748,9 +863,8 @@ fun BrowseScreen() {
                                 pageHost.set(AdBlocker.hostOf(url ?: ""))
                                 pageStartedAt.set(System.currentTimeMillis())
                                 sniffNetCount.set(0)
+                                resCount.set(0)
                                 blockedAtStart.set(AdBlocker.blockedCount())
-                                canGoBack = v?.canGoBack() ?: false
-                                canGoForward = v?.canGoForward() ?: false
                                 media.clear()
                                 sniffQueue.clear()
                                 if (!blank) Diag.log("PAGE_START", pageHost.get().orEmpty())
@@ -758,18 +872,52 @@ fun BrowseScreen() {
 
                             override fun onPageFinished(v: WebView?, url: String?) {
                                 loading = 1f
-                                canGoBack = v?.canGoBack() ?: false
-                                canGoForward = v?.canGoForward() ?: false
                                 // Deeplinks are not pages: storing one would make the
                                 // next start restore an error screen.
                                 val page = httpOnly(url)
                                 if (page != null) {
-                                    if (activeTab in tabs.indices) {
-                                        tabs[activeTab] = TabEntry(
+                                    val cur = tabs.getOrNull(activeTab)
+                                    if (cur != null) {
+                                        val hist = cur.history.toMutableList()
+                                        var cursor = cur.cursor
+                                        // Moving through history lands on a URL the
+                                        // cursor already points at, so only genuinely
+                                        // new pages get appended — and anything ahead
+                                        // of the cursor is dropped, like a browser.
+                                        if (hist.getOrNull(cursor) != page) {
+                                            if (freshNav) {
+                                                while (hist.size > cursor + 1) {
+                                                    hist.removeAt(hist.lastIndex)
+                                                }
+                                                hist.add(page)
+                                                cursor = hist.lastIndex
+                                            } else if (cursor >= 0) {
+                                                // A redirect or an auto-jump of the page
+                                                // we just started loading: same history
+                                                // entry, new URL.
+                                                hist[cursor] = page
+                                            } else {
+                                                hist.add(page)
+                                                cursor = hist.lastIndex
+                                            }
+                                            freshNav = false
+                                        }
+                                        tabs[activeTab] = cur.copy(
                                             url = page,
-                                            title = v?.title?.takeIf { it.isNotBlank() } ?: page,
+                                            title = v?.title?.trim()
+                                                ?.takeIf { it.isNotEmpty() && it != "about:blank" }
+                                                ?: page,
+                                            history = hist,
+                                            cursor = cursor,
                                         )
                                         persistTabs()
+                                        HistoryStore.add(
+                                            prefs,
+                                            page,
+                                            v?.title?.trim()
+                                                ?.takeIf { it.isNotEmpty() && it != "about:blank" }
+                                                ?: page,
+                                        )
                                     }
                                     if (prefs.getBoolean("remember_page", false)) {
                                         prefs.edit().putString("last_page", page).apply()
@@ -790,7 +938,7 @@ fun BrowseScreen() {
                                 Diag.log(
                                     "PAGE_DONE",
                                     "host=${AdBlocker.hostOf(url ?: "").orEmpty()} ms=$elapsed " +
-                                        "sniffed=${media.size} net=${sniffNetCount.get()} " +
+                                        "res=${resCount.get()} sniffed=${media.size} net=${sniffNetCount.get()} " +
                                         "blocked=${AdBlocker.blockedCount() - blockedAtStart.get()} " +
                                         "js=${v?.settings?.javaScriptEnabled}",
                                 )
@@ -838,6 +986,7 @@ fun BrowseScreen() {
                             ): WebResourceResponse? {
                                 if (request == null) return null
                                 val u = request.url.toString()
+                                resCount.incrementAndGet()
 
                                 // The document itself is never blocked — a rule that
                                 // happens to match the page would leave a blank tab.
@@ -876,6 +1025,7 @@ fun BrowseScreen() {
                     onSubmit = { navigate(it) },
                     onOpen = { url ->
                         showStart = false
+                        freshNav = true
                         webView?.loadUrl(url)
                     },
                 )
@@ -914,50 +1064,6 @@ fun BrowseScreen() {
         )
     }
 
-    if (historyOpen) {
-        AlertDialog(
-            onDismissRequest = { historyOpen = false },
-            title = { Text("浏览历史") },
-            text = {
-                if (historyItems.isEmpty()) {
-                    Text("暂无历史")
-                } else {
-                    LazyColumn(Modifier.heightIn(max = 420.dp)) {
-                        items(historyItems) { row ->
-                            Column(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        historyOpen = false
-                                        showStart = false
-                                        webView?.loadUrl(row.second)
-                                    }
-                                    .padding(vertical = 10.dp),
-                            ) {
-                                Text(
-                                    row.first.ifBlank { row.second },
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Text(
-                                    row.second,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { historyOpen = false }) { Text("关闭") }
-            },
-        )
-    }
-
     if (showTabs) {
         ModalBottomSheet(onDismissRequest = { showTabs = false }) {
             Column(Modifier.padding(horizontal = 16.dp)) {
@@ -981,18 +1087,7 @@ fun BrowseScreen() {
                             .fillMaxWidth()
                             .clickable {
                                 showTabs = false
-                                activeTab = i
-                                persistTabs()
-                                val target = httpOnly(tab.url)
-                                if (target == null) {
-                                    showStart = true
-                                    address = ""
-                                    webView?.loadUrl("about:blank")
-                                } else {
-                                    showStart = false
-                                    address = target
-                                    webView?.loadUrl(target)
-                                }
+                                switchToTab(i)
                             }
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
@@ -1021,11 +1116,15 @@ fun BrowseScreen() {
                         }
                         if (tabs.size > 1) {
                             IconButton(onClick = {
+                                val wasActive = i == activeTab
                                 tabs.removeAt(i)
                                 if (activeTab > i || activeTab >= tabs.size) {
                                     activeTab = (activeTab - 1).coerceAtLeast(0)
                                 }
                                 persistTabs()
+                                // Closing the tab on screen has to load the survivor,
+                                // otherwise the closed tab's page stays visible.
+                                if (wasActive) switchToTab(activeTab)
                             }) {
                                 Icon(Icons.Default.Close, contentDescription = "关闭标签")
                             }
