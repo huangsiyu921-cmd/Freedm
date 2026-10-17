@@ -34,6 +34,14 @@ object Repo {
     private val _tasks = MutableStateFlow<List<DownloadTask>>(emptyList())
     val tasks: StateFlow<List<DownloadTask>> = _tasks.asStateFlow()
 
+    /** Bumped when the theme preference changes, so the root can re-read it. */
+    private val _themeTick = MutableStateFlow(0)
+    val themeTick: StateFlow<Int> = _themeTick.asStateFlow()
+
+    fun bumpTheme() {
+        _themeTick.value = _themeTick.value + 1
+    }
+
     private val _segments = MutableStateFlow<Map<Long, List<Segment>>>(emptyMap())
     val segments: StateFlow<Map<Long, List<Segment>>> = _segments.asStateFlow()
 

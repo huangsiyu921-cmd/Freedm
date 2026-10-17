@@ -1,4 +1,4 @@
-﻿package app.freedm
+package app.freedm
 
 import android.Manifest
 import android.content.Intent
@@ -10,6 +10,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
 import app.freedm.data.Repo
 import app.freedm.ui.ShareBus
 import app.freedm.ui.firstUrl
@@ -56,6 +58,9 @@ import app.freedm.ui.screens.PrivacyScreen
 import app.freedm.ui.screens.SettingsScreen
 import app.freedm.ui.screens.TaskDetailScreen
 import app.freedm.ui.theme.FreeDmTheme
+import app.freedm.ui.theme.THEME_DYNAMIC
+import app.freedm.ui.theme.THEME_MODE
+import app.freedm.ui.theme.isDarkTheme
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.cancel
@@ -89,7 +94,21 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            FreeDmTheme {
+            val tick by Repo.themeTick.collectAsState()
+            val prefs = Repo.prefs()
+            val mode = remember(tick) { prefs.getString(THEME_MODE, "system") ?: "system" }
+            val dynamic = remember(tick) { prefs.getBoolean(THEME_DYNAMIC, false) }
+
+            FreeDmTheme(mode = mode, dynamicColor = dynamic) {
+                // System bar icons must follow what Compose paints, not what the
+                // XML theme guessed: otherwise a dark UI gets black status icons.
+                val dark = isDarkTheme(mode)
+                LaunchedEffect(dark) {
+                    WindowCompat.getInsetsController(window, window.decorView).apply {
+                        isAppearanceLightStatusBars = !dark
+                        isAppearanceLightNavigationBars = !dark
+                    }
+                }
                 // Window background is white (themes.xml), so paint the whole
                 // root with the theme colour rather than letting it show through
                 // around native views.

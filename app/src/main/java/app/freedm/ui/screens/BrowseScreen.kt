@@ -11,11 +11,13 @@ import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebStorage
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -51,7 +53,9 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -87,11 +91,26 @@ import app.freedm.engine.Engine
 import app.freedm.engine.FileNamer
 import app.freedm.engine.Prober
 import app.freedm.service.DownloadService
+import app.freedm.ui.formatBytes
 import app.freedm.ui.firstUrl
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+
+/** Extensions that should become a download task instead of a page load. */
+private val DOWNLOAD_EXT = setOf(
+    "apk", "zip", "7z", "rar", "tar", "gz", "bz2", "xz", "iso", "img", "exe", "msi",
+    "dmg", "pkg", "deb", "rpm", "torrent",
+    "mp4", "mkv", "avi", "mov", "webm", "flv", "mp3", "flac", "wav", "m4a", "ogg",
+    "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "epub",
+)
+
+private fun looksLikeDownload(url: String): Boolean {
+    val name = url.substringBefore('?').substringBefore('#').substringAfterLast('/')
+    val ext = name.substringAfterLast('.', "").lowercase()
+    return ext.isNotEmpty() && ext in DOWNLOAD_EXT
+}
 
 private const val UA_DESKTOP =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
@@ -104,12 +123,14 @@ fun BrowseScreen() {
     val ctx = LocalContext.current
     val prefs = remember { Repo.prefs() }
     val scope = rememberCoroutineScope()
+    val darkUi = isSystemInDarkTheme()
 
     var address by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(0f) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     val media = remember { mutableStateListOf<SniffedMedia>() }
+    val selected = remember { mutableStateListOf<String>() }
     var showMedia by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     // The start page is a Compose overlay rather than a loaded URL, so the first
@@ -123,6 +144,7 @@ fun BrowseScreen() {
     var historyOpen by remember { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
 
+    var showCookies by remember { mutableStateOf(false) }
     var snifferEnabled by remember { mutableStateOf(prefs.getBoolean("sniff", true)) }
     var desktopUa by remember { mutableStateOf(prefs.getBoolean("desktop_ua", false)) }
 
@@ -163,38 +185,70 @@ fun BrowseScreen() {
         }
     }
 
-    fun saveCurrentPage() {
-        val url = address
+    /**
+     * Creates one task per selected candidate, then hands them to the queue.
+     * Uses `pump()` rather than `start()` per item so `max_concurrent` still holds.
+     */
+    fun addSelected() {
+        val picked = media.filter { it.key in selected }
+        if (picked.isEmpty()) return
+        scope.launch {
+            var added = 0
+            withContext(Dispatchers.IO) {
+                picked.forEach { item ->
+                    runCatching {
+                        val probe = runCatching { Prober.probe(item.url) }.getOrNull()
+                        val dir = Repo.downloadsDir
+                        val nm = FileNamer.uniqueIn(
+                            dir,
+                            FileNamer.sanitize(
+                                probe?.suggestedName ?: item.title.ifBlank { "media" },
+                            ),
+                        )
+                        Repo.create(
+                            item.url, nm, dir.absolutePath,
+                            Engine.defaultThreads(), false, probe,
+                        )
+                        added++
+                    }
+                }
+            }
+            if (added > 0) {
+                DownloadService.start(Repo.context)
+                Engine.pump()
+            }
+            Toast.makeText(ctx, "已添加 $added 项", Toast.LENGTH_SHORT).show()
+            showMedia = false
+            selected.clear()
+        }
+    }
+
+    /** Queues one URL through the normal probe/segment path. */
+    fun startDownload(url: String) {
         if (url.isBlank()) return
         scope.launch {
             val probe = withContext(Dispatchers.IO) {
                 runCatching { Prober.probe(url) }.getOrNull()
             }
             val dir = Repo.downloadsDir
-            val fallback = url.substringAfterLast('/').substringBefore('?').ifBlank { "page" }
+            val fallback = url.substringAfterLast('/').substringBefore('?').ifBlank { "download" }
             val name = FileNamer.uniqueIn(
                 dir,
                 FileNamer.sanitize(probe?.suggestedName ?: fallback),
             )
-            val id = Repo.create(url, name, dir.absolutePath, Engine.defaultThreads(), false, probe)
+            Repo.create(url, name, dir.absolutePath, Engine.defaultThreads(), false, probe)
             DownloadService.start(Repo.context)
-            Engine.start(id)
+            Engine.pump()
             Toast.makeText(ctx, "已加入下载", Toast.LENGTH_SHORT).show()
         }
     }
 
-    fun clearBrowsingData() {
-        runCatching {
-            CookieManager.getInstance().removeAllCookies(null)
-            CookieManager.getInstance().flush()
-            WebStorage.getInstance().deleteAllData()
-            webView?.clearHistory()
-            webView?.clearCache(true)
-            webView?.clearFormData()
-            prefs.edit().remove("last_page").apply()
-        }
-        showStartPage()
-        Toast.makeText(ctx, "已清除", Toast.LENGTH_SHORT).show()
+    fun saveCurrentPage() = startDownload(address)
+
+
+    if (showCookies) {
+        SiteDataScreen(onBack = { showCookies = false })
+        return
     }
 
     // Back closes the find bar first, then walks WebView history, then returns
@@ -374,9 +428,9 @@ fun BrowseScreen() {
                         menuOpen = false
                         setDesktop(!desktopUa)
                     }
-                    MenuItem("清除浏览数据") {
+                    MenuItem("网站数据") {
                         menuOpen = false
-                        clearBrowsingData()
+                        showCookies = true
                     }
                 }
             }
@@ -428,17 +482,16 @@ fun BrowseScreen() {
                 modifier = Modifier.fillMaxSize(),
                 factory = { c ->
                     WebView(c).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                        )
                         settings.javaScriptEnabled = prefs.getBoolean("js_enabled", true)
                         settings.domStorageEnabled = true
                         settings.userAgentString = if (desktopUa) UA_DESKTOP else Prober.UA
                         settings.loadWithOverviewMode = true
                         settings.useWideViewPort = true
+                        // Follow the app theme instead of flashing a white page.
+                        if (android.os.Build.VERSION.SDK_INT >= 33) {
+                            settings.isAlgorithmicDarkeningAllowed = darkUi
+                        }
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
-                        webView = this
 
                         // Restore the last page when the user asked for it.
                         if (prefs.getBoolean("remember_page", false)) {
@@ -448,7 +501,26 @@ fun BrowseScreen() {
                             }
                         }
 
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                loading = newProgress / 100f
+                            }
+                        }
+
                         webViewClient = object : WebViewClient() {
+
+                            override fun shouldOverrideUrlLoading(
+                                v: WebView?,
+                                request: WebResourceRequest?,
+                            ): Boolean {
+                                val url = request?.url?.toString() ?: return false
+                                // Direct file links would otherwise navigate to a
+                                // page that renders as garbage; turn them into tasks.
+                                if (!looksLikeDownload(url)) return false
+                                startDownload(url)
+                                return true
+                            }
+
                             override fun onPageStarted(v: WebView?, url: String?, favicon: Bitmap?) {
                                 // Backing out to about:blank must land on the start
                                 // page, not on an empty white WebView.
@@ -463,10 +535,20 @@ fun BrowseScreen() {
                             override fun onPageFinished(v: WebView?, url: String?) {
                                 canGoBack = v?.canGoBack() ?: false
                                 canGoForward = v?.canGoForward() ?: false
-                                if (url != null && url != "about:blank" &&
-                                    prefs.getBoolean("remember_page", false)
-                                ) {
-                                    prefs.edit().putString("last_page", url).apply()
+                                if (url != null && url != "about:blank") {
+                                    if (prefs.getBoolean("remember_page", false)) {
+                                        prefs.edit().putString("last_page", url).apply()
+                                    }
+                                    runCatching { android.net.Uri.parse(url).host }.getOrNull()
+                                        ?.let { host ->
+                                            val seen = prefs.getStringSet("visited_hosts", null)
+                                                ?.toMutableSet() ?: mutableSetOf()
+                                            if (seen.add(host)) {
+                                                prefs.edit()
+                                                    .putStringSet("visited_hosts", seen)
+                                                    .apply()
+                                            }
+                                        }
                                 }
                                 if (!snifferEnabled || v == null) return
                                 v.evaluateJavascript(Sniffer.PROBE_JS) { raw ->
@@ -596,7 +678,37 @@ fun BrowseScreen() {
     if (showMedia) {
         ModalBottomSheet(onDismissRequest = { showMedia = false }) {
             Column(Modifier.padding(16.dp)) {
-                Text("检测到的媒体（${media.size}）", style = MaterialTheme.typography.titleMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                                    "检测到 ${media.size} 个文件",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Spacer(Modifier.weight(1f))
+                    TextButton(onClick = {
+                        if (selected.size == media.size) selected.clear()
+                        else {
+                            selected.clear()
+                            media.forEach { selected.add(it.key) }
+                        }
+                            }) { Text(if (selected.size == media.size && media.isNotEmpty()) "取消全选" else "全选") }
+                }
+                if (media.isNotEmpty()) {
+                    val known = media.filter { it.key in selected && it.sizeHint > 0 }
+                        .sumOf { it.sizeHint }
+                    val unknown = media.count { it.key in selected && it.sizeHint <= 0 }
+                    Text(
+                        buildString {
+                            append("选择要下载的文件")
+                            if (selected.isNotEmpty()) {
+                                    append(" · 已选 ${selected.size}")
+                                if (known > 0) append(" · ${formatBytes(known)}")
+                                    if (unknown > 0) append(if (known > 0) " + $unknown 项未知大小" else " · $unknown 项未知大小")
+                            }
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
                 Spacer(Modifier.height(10.dp))
                 if (media.isEmpty()) {
                     Text(
@@ -607,76 +719,118 @@ fun BrowseScreen() {
                 } else {
                     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(media.toList(), key = { it.key }) { item ->
-                            Card(Modifier.fillMaxWidth()) {
-                                Column(Modifier.padding(12.dp)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        AssistChip(
-                                            onClick = {},
-                                            label = {
-                                                Text(
-                                                    when (item.kind) {
-                                                        SniffedMedia.Kind.VIDEO -> "VIDEO"
-                                                        SniffedMedia.Kind.AUDIO -> "AUDIO"
-                                                        SniffedMedia.Kind.HLS -> "HLS"
-                                                        SniffedMedia.Kind.DASH -> "DASH"
-                                                        SniffedMedia.Kind.FILE -> "FILE"
-                                                    },
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                )
-                                            },
-                                        )
-                                        Spacer(Modifier.width(8.dp))
+                            val isSel = item.key in selected
+                            Card(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        if (isSel) selected.remove(item.key) else selected.add(item.key)
+                                    },
+                            ) {
+                                Row(
+                                    Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Checkbox(
+                                        checked = isSel,
+                                        onCheckedChange = {
+                                            if (it) selected.add(item.key) else selected.remove(item.key)
+                                        },
+                                    )
+                                    Column(
+                                        Modifier
+                                            .weight(1f)
+                                            .padding(start = 4.dp),
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            AssistChip(
+                                                onClick = {},
+                                                label = {
+                                                    Text(
+                                                        when (item.kind) {
+                                                            SniffedMedia.Kind.VIDEO -> "VIDEO"
+                                                            SniffedMedia.Kind.AUDIO -> "AUDIO"
+                                                            SniffedMedia.Kind.HLS -> "HLS"
+                                                            SniffedMedia.Kind.DASH -> "DASH"
+                                                            SniffedMedia.Kind.FILE -> "FILE"
+                                                        },
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                    )
+                                                },
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                item.title.take(60),
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis,
+                                            )
+                                        }
+                                        Spacer(Modifier.height(3.dp))
                                         Text(
-                                            item.title.take(60),
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            item.url,
+                                            style = MaterialTheme.typography.bodySmall,
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis,
-                                        )
-                                    }
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        item.url,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    )
-                                    if (item.kind == SniffedMedia.Kind.HLS || item.kind == SniffedMedia.Kind.DASH) {
-                                        Spacer(Modifier.height(4.dp))
-                                        Text(
-                                            "流媒体清单，将按单个文件下载（不含分片合并）",
-                                            style = MaterialTheme.typography.labelSmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         )
-                                    }
-                                    Spacer(Modifier.height(6.dp))
-                                    TextButton(onClick = {
-                                        scope.launch {
-                                            val probe = withContext(Dispatchers.IO) {
-                                                runCatching { Prober.probe(item.url) }.getOrNull()
+                                        Spacer(Modifier.height(2.dp))
+                                        Row {
+                                            Text(
+                                                if (item.sizeHint > 0) {
+                                                    formatBytes(item.sizeHint)
+                                                } else {
+                                                    "大小未知"
+                                                },
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                            if (item.fromNetwork) {
+                                                Spacer(Modifier.width(8.dp))
+                                                Text(
+                                                    "来自网络请求",
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                )
                                             }
-                                            val dir = Repo.downloadsDir
-                                            val nm = FileNamer.uniqueIn(
-                                                dir,
-                                                FileNamer.sanitize(
-                                                    probe?.suggestedName ?: item.title.ifBlank { "media" },
-                                                ),
-                                            )
-                                            val id = Repo.create(
-                                                item.url, nm, dir.absolutePath,
-                                                Engine.defaultThreads(), false, probe,
-                                            )
-                                            DownloadService.start(Repo.context)
-                                            Engine.start(id)
-                                            showMedia = false
                                         }
-                                    }) { Text("下载") }
+                                        if (item.kind == SniffedMedia.Kind.HLS ||
+                                            item.kind == SniffedMedia.Kind.DASH
+                                        ) {
+                                            Text(
+                                            "流媒体清单，按单个文件下载",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.height(20.dp))
+                if (media.isNotEmpty()) {
+                    Spacer(Modifier.height(12.dp))
+                    HorizontalDivider()
+                    Spacer(Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextButton(onClick = {
+                            showMedia = false
+                            selected.clear()
+                        }) { Text("关闭") }
+                        Spacer(Modifier.weight(1f))
+                        Button(
+                            onClick = { addSelected() },
+                            enabled = selected.isNotEmpty(),
+                        ) {
+                            Text(
+                                        if (selected.isEmpty()) "下载" else "下载 ${selected.size} 项",
+                            )
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.height(20.dp))
+                }
             }
         }
     }

@@ -18,6 +18,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -32,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import app.freedm.data.Repo
 import app.freedm.engine.Engine
+import app.freedm.ui.theme.THEME_DYNAMIC
+import app.freedm.ui.theme.THEME_MODE
 import app.freedm.ui.formatBytes
 import kotlin.math.ln
 
@@ -58,10 +61,48 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit) {
     var jsEnabled by remember { mutableStateOf(prefs.getBoolean("js_enabled", true)) }
     var rememberPage by remember { mutableStateOf(prefs.getBoolean("remember_page", false)) }
     var clipWatch by remember { mutableStateOf(prefs.getBoolean("clipboard_watch", false)) }
+    var themeMode by remember { mutableStateOf(prefs.getString(THEME_MODE, "system") ?: "system") }
+    var dynamicColor by remember { mutableStateOf(prefs.getBoolean(THEME_DYNAMIC, false)) }
     val ctx = androidx.compose.ui.platform.LocalContext.current
 
     Scaffold(topBar = { TopAppBar(title = { Text("设置") }) }) { pad ->
         LazyColumn(Modifier.fillMaxSize().padding(pad)) {
+            item { GroupTitle("个性化") }
+            item {
+                Column {
+                    ThemeRow("跟随系统", themeMode == "system") {
+                        themeMode = "system"
+                        prefs.edit().putString(THEME_MODE, "system").apply()
+                        Repo.bumpTheme()
+                    }
+                    ThemeRow("亮色", themeMode == "light") {
+                        themeMode = "light"
+                        prefs.edit().putString(THEME_MODE, "light").apply()
+                        Repo.bumpTheme()
+                    }
+                    ThemeRow("暗色", themeMode == "dark") {
+                        themeMode = "dark"
+                        prefs.edit().putString(THEME_MODE, "dark").apply()
+                        Repo.bumpTheme()
+                    }
+                }
+            }
+            item {
+                val supported = android.os.Build.VERSION.SDK_INT >= 31
+                SwitchRow(
+                    label = "动态取色",
+                    description = if (supported) "用壁纸配色" else "需要 Android 12 及以上",
+                    checked = dynamicColor && supported,
+                    onChange = {
+                        if (supported) {
+                            dynamicColor = it
+                            prefs.edit().putBoolean(THEME_DYNAMIC, it).apply()
+                            Repo.bumpTheme()
+                        }
+                    },
+                )
+            }
+
             item { GroupTitle("下载") }
             item {
                 SliderRow(
@@ -418,6 +459,20 @@ private fun SliderRow(
             Text(display, style = MaterialTheme.typography.bodyMedium)
         }
         Slider(value = value, onValueChange = onChange, valueRange = range, steps = steps)
+    }
+}
+
+@Composable
+private fun ThemeRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
+        RadioButton(selected = selected, onClick = onClick)
     }
 }
 

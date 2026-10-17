@@ -142,12 +142,9 @@ fun StartPage(
                 animationSpec = tween(170, easing = FastOutSlowInEasing),
             ) { v: Float, _: Float -> dragX = v }
             index = ((index + direction) % count + count) % count
-            dragX = direction * w
-            animate(
-                dragX,
-                0f,
-                animationSpec = tween(190, easing = FastOutSlowInEasing),
-            ) { v: Float, _: Float -> dragX = v }
+            // The neighbour card has already travelled to the centre, so reset
+            // without jumping — that is what removes the cut between cards.
+            dragX = 0f
         }
     }
 
@@ -203,7 +200,7 @@ fun StartPage(
                                 dragX += pan.x
                                 event.changes.forEach { it.consume() }
                             } else if (axis == 2) {
-                                unfold = (unfold + pan.y / 320f).coerceIn(0f, 1f)
+                                unfold = (unfold - pan.y / 320f).coerceIn(0f, 1f)
                                 event.changes.forEach { it.consume() }
                             }
                         }
@@ -255,6 +252,24 @@ fun StartPage(
                                     alpha = if (depth == 1) 0.9f else 0.65f
                                 },
                         )
+                    }
+
+                    // The neighbour rides in from the far side while the front
+                    // card leaves, so a flip has no gap in the middle.
+                    if (abs(dragX) > 2f) {
+                        val nbIndex = if (dragX < 0f) (index + 1) % count else (index - 1 + count) % count
+                        val nb = deck.getOrNull(nbIndex)
+                        val w = cardWidth.floatValue
+                        val offset = if (dragX < 0f) dragX + w else dragX - w
+                        val nbModifier = Modifier
+                            .fillMaxWidth(0.93f)
+                            .height(160.dp)
+                            .graphicsLayer { translationX = offset }
+                        if (nb == null) {
+                            BackCard(site = null, modifier = nbModifier)
+                        } else {
+                            CardFace(site = nb, modifier = nbModifier)
+                        }
                     }
 
                     val frontModifier = Modifier
