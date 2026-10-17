@@ -67,6 +67,10 @@ fun SiteDataScreen(onBack: () -> Unit) {
                 cm.setCookie("https://$host", "$name=; Max-Age=0; Path=/; Domain=$host")
             }
         runCatching { cm.flush() }
+        // Cookies alone are not the session: localStorage / IndexedDB hold tokens too,
+        // and the next page load writes the cookies straight back — which looks like
+        // "deleted it and it came back by itself".
+        runCatching { android.webkit.WebStorage.getInstance().deleteOrigin("https://$host") }
         hosts = hosts.filterNot { it == host }
         prefs.edit().putStringSet("visited_hosts", hosts.toSet()).apply()
         tick++

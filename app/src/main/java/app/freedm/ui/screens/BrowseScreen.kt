@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.size
@@ -147,10 +148,11 @@ private data class TabEntry(
  */
 private const val DESKTOP_VIEWPORT_JS = """
 (function() {
-  var w = '1280';
+  var w = 1280;
+  var scale = (window.innerWidth > 0 ? window.innerWidth / w : 1).toFixed(3);
   var m = document.querySelector('meta[name="viewport"]');
   if (!m) { m = document.createElement('meta'); m.setAttribute('name', 'viewport'); document.head.appendChild(m); }
-  m.setAttribute('content', 'width=' + w);
+  m.setAttribute('content', 'width=' + w + ', initial-scale=' + scale);
   document.documentElement.style.minWidth = w + 'px';
 })();
 """
@@ -159,8 +161,376 @@ private const val UA_DESKTOP =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
+/**
+ * Dumps the request body of the MFA endpoints from the page's own bundle.
+ *
+ * `create_verification_code` answers with a gateway-level success and puts the real
+ * outcome in `data.biz_code`, so a wrong request shape looks like a working one until
+ * no mail arrives. The call site carries the exact field names.
+ */
+private const val MFA_CALL_JS = """
+(function() {
+  if (window.__freedmMfaCall) return;
+  window.__freedmMfaCall = true;
+  var urls = performance.getEntriesByType('resource')
+    .map(function(e) { return e.name })
+    .filter(function(n) { return /\.js(\?|$)/.test(n); });
+  var done = false;
+  urls.forEach(function(u) {
+    if (done) return;
+    fetch(u).then(function(r) { return r.text(); }).then(function(t) {
+      if (done) return;
+      var i = t.indexOf('/mfa/create_verification_code');
+      if (i < 0) return;
+      done = true;
+      console.error('FREEDM_MFA_CREATE ' + t.slice(i, i + 320).replace(/\s+/g, ' '));
+      var j = t.indexOf('/mfa/check_verification_code');
+      if (j >= 0) console.error('FREEDM_MFA_CHK ' + t.slice(j, j + 320).replace(/\s+/g, ' '));
+    }).catch(function() {});
+  });
+})();
+"""
+
+/**
+ * Guards against promises that never settle in Android WebView.
+ *
+ * `navigator.credentials.*` (Credential Management) is not implemented there: calls do
+ * not throw and do not reject, they just never settle. A login flow that awaits one
+ * shows a spinner forever, with no error and no further request — which is exactly what
+ * DeepSeek's "验证账号" screen does. Service worker registration is the other classic:
+ * `ready` hangs if the registration never activates. Both are raced against a timeout so
+ * the page can move on, and every call is logged.
+ */
+private const val PENDING_GUARD_JS = """
+(function() {
+  if (window.__freedmPendingGuard) return;
+  window.__freedmPendingGuard = true;
+  function log(m) { try { console.error('FREEDM_GUARD ' + m); } catch (_) {} }
+  try {
+    var c = navigator.credentials;
+    if (!c) {
+      log('credentials=absent');
+    } else {
+      ['store', 'get', 'create'].forEach(function(k) {
+        var f = c[k];
+        if (typeof f !== 'function') { log('cred.' + k + '=missing'); return; }
+        c[k] = function() {
+          log('cred.' + k + ' called');
+          var p;
+          try {
+            p = f.apply(c, arguments);
+          } catch (e) {
+            log('cred.' + k + ' threw');
+            return Promise.resolve(null);
+          }
+          if (!p || typeof p.then !== 'function') return p;
+          return Promise.race([p, new Promise(function(res) {
+            setTimeout(function() { log('cred.' + k + ' stuck'); res(null); }, 2500);
+          })]);
+        };
+      });
+    }
+  } catch (e) { log('cred patch failed'); }
+  try {
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.getRegistrations().then(function(r) {
+        log('sw regs=' + r.length);
+      }, function() { log('sw regs error'); });
+      navigator.serviceWorker.ready.then(function() { log('sw ready'); });
+    } else {
+      log('sw absent');
+    }
+  } catch (e) { log('sw probe failed'); }
+})();
+"""
+
+/**
+ * Bridge for finishing a login that the page itself abandons.
+ *
+ * DeepSeek answers the password step with `MFA_VERIFICATION_CODE_REQUIRED` and an
+ * `mfa_session_id`, then never builds the input for the code — the page just sits on an
+ * empty overlay. The two endpoints it would have called are known, so the app asks for
+ * the code itself and calls them directly.
+ */
+private const val MFA_BRIDGE_JS = """
+(function() {
+  if (window.__freedmMfaBridge) return;
+  window.__freedmMfaBridge = true;
+  function post(path, body) {
+    return fetch(path, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    }).then(function(r) { return r.json(); });
+  }
+  window.__freedmMfaSend = function() {
+    var sid = window.__freedmMfaSid;
+    if (!sid) { console.error('FREEDM_MFA_SEND_ERR no-sid'); return; }
+    post('/auth-api/v0/users/mfa/create_verification_code', { mfa_session_id: sid })
+      .then(function(j) {
+        // Two layers again: `code` is the gateway, `data.biz_code` is the real answer
+        // (rate limiting, "already sent", …).
+        var bd = j.data || {};
+        console.error('FREEDM_MFA_SEND ' + JSON.stringify({
+          code: j.code,
+          biz: bd.biz_code,
+          msg: String(bd.biz_msg || j.msg || '').slice(0, 60)
+        }));
+      })
+      .catch(function(e) { console.error('FREEDM_MFA_SEND_ERR ' + String(e).slice(0, 80)); });
+  };
+  window.__freedmMfaCheck = function(input) {
+    var sid = window.__freedmMfaSid;
+    if (!sid) { console.error('FREEDM_MFA_CHECK_ERR no-sid'); return; }
+    post('/auth-api/v0/users/mfa/check_verification_code', {
+      mfa_session_id: sid,
+      verification_code: input
+    }).then(function(j) {
+      console.error('FREEDM_MFA_CHECK ' + JSON.stringify({
+        code: j.code, msg: String(j.msg || '').slice(0, 60)
+      }));
+      if (j.code === 0) {
+        try { location.href = '/usage'; } catch (_) { try { location.reload(); } catch (_) {} }
+      }
+    }).catch(function(e) { console.error('FREEDM_MFA_CHECK_ERR ' + String(e).slice(0, 80)); });
+  };
+})();
+"""
+
+private const val PAGE_ENV_JS = """(function() {
+  try {
+    var f = document.querySelector('input:not([type=hidden]),textarea,[contenteditable=true]');
+    var v = document.querySelector('meta[name=viewport]');
+    return JSON.stringify({
+      field: f ? (f.tagName + '/' + (f.type || '') + '/' + (f.isContentEditable ? 'ce' : '')) : 'none',
+      vp: v ? v.getAttribute('content') : 'none',
+      w: window.innerWidth,
+      h: window.innerHeight,
+      dpr: window.devicePixelRatio,
+      uad: (navigator.userAgentData && navigator.userAgentData.brands)
+        ? navigator.userAgentData.brands.map(function (b) { return b.brand }).join(',')
+        : 'none',
+      ua: navigator.userAgent.slice(0, 90)
+    });
+  } catch (e) { return 'err:' + e.message; }
+})();
+"""
+
 /** Upper bound on sniffed candidates; a long browsing session must not grow forever. */
 private const val MAX_SNIFFED = 400
+
+/**
+ * Works around a WebView quirk: after an IME insert the caret stays at 0, so every
+ * following character lands in front of the previous one (typing "asdf" shows up as
+ * "fdsa"). Deletions are unaffected, which is the giveaway — the caret really sits at
+ * position 0 instead of the value being rearranged afterwards.
+ *
+ * The fix runs a tick after the insert so the page's own handlers have had their go,
+ * and only touches fields that are still at position 0. Logging rides along when
+ * diagnostics are enabled, since the page and the app share no other channel.
+ */
+private const val INPUT_FIX_JS = """
+(function() {
+  if (window.__freedmInputFix) return;
+  window.__freedmInputFix = true;
+  document.addEventListener('input', function(e) {
+    var t = e.target;
+    if (!t || typeof t.value !== 'string') return;
+    if (String(e.inputType || '').indexOf('insert') !== 0) return;
+    if (t.selectionStart !== 0 || t.selectionEnd !== 0) return;
+    setTimeout(function() {
+      try {
+        if (t.selectionStart === 0 && t.selectionEnd === 0 && t.value) {
+          t.setSelectionRange(t.value.length, t.value.length);
+        }
+        if (window.__freedmInputLog) {
+          console.error('FREEDM_INPUT ' + JSON.stringify({
+            it: e.inputType || '',
+            d: (e.data || '').slice(0, 12),
+            ss: t.selectionStart,
+            len: t.value.length,
+            head: t.value.slice(0, 24)
+          }));
+        }
+      } catch (_) {}
+    }, 0);
+  }, true);
+  // Flipped on by the diagnostics probe, so a release build does not log keystrokes.
+  window.__freedmInputLog = false;
+})();
+"""
+
+/**
+ * Records the page's own network calls (fetch / XHR) with their status or failure, and
+ * — for the login call only — what came back and what the screen shows a moment later.
+ * A login that spins forever after a 200 means the page gave up on its own, and the
+ * page text at that point says why ("verify", "network error", …). Response bodies are
+ * never logged, only the top-level keys.
+ */
+private const val NET_PROBE_JS = """
+(function() {
+  if (window.__freedmNetProbe) return;
+  window.__freedmNetProbe = true;
+  window.__freedmInputLog = true;
+  function r(u) { return String(u || '').slice(0, 90); }
+  function isLogin(u) { return String(u || '').indexOf('/login') >= 0; }
+  // Unhandled rejections and errors are what leaves a page spinning after a successful
+  // call: the await never resolves because something blew up where nobody catches it.
+  window.addEventListener('unhandledrejection', function(e) {
+    try {
+      var r = e.reason;
+      console.error('FREEDM_REJECT ' + String((r && (r.stack || r.message)) || r).slice(0, 220));
+    } catch (_) {}
+  });
+  window.addEventListener('error', function(e) {
+    try {
+      console.error('FREEDM_ERROR ' + String(e.message).slice(0, 160) +
+        ' @' + String(e.filename || '').slice(0, 70) + ':' + e.lineno);
+    } catch (_) {}
+  });
+  function afterLogin() {
+    setTimeout(function() {
+      try {
+        var m = document.querySelector(
+          '[role=dialog],[class*=modal],[class*=Modal],[class*=dialog],[class*=Dialog],[class*=mask],[class*=Mask]'
+        );
+        var modal = 'none';
+        if (m) {
+          var cs = getComputedStyle(m);
+          var kid = m.firstElementChild;
+          var par = m.parentElement;
+          modal = {
+            cls: String(m.className || '').slice(0, 46),
+            op: cs.opacity, vis: cs.visibility, z: cs.zIndex,
+            w: m.offsetWidth, h: m.offsetHeight,
+            kids: m.children.length,
+            kid: kid ? (kid.tagName + '.' + String(kid.className || '').slice(0, 34)) : 'none',
+            html: (m.innerHTML || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').slice(0, 120),
+            par: par
+              ? (String(par.className || '').slice(0, 30) + ' kids=' + par.children.length +
+                 ' txt=' + (par.innerText || '').replace(/\s+/g, ' ').slice(0, 90))
+              : 'none'
+          };
+        }
+        console.error('FREEDM_AFTER_LOGIN ' + JSON.stringify({
+          url: String(location.href).slice(0, 80),
+          modal: modal,
+          frames: Array.prototype.slice.call(document.querySelectorAll('iframe')).slice(0, 4)
+            .map(function(f) {
+              return String(f.src || '(blank)').slice(0, 46) + ' ' + f.offsetWidth + 'x' + f.offsetHeight;
+            }).join(' || '),
+          canvas: document.querySelectorAll('canvas').length,
+          ck: document.cookie.length,
+          ls: (function() { try { return Object.keys(localStorage).length } catch (_) { return -1 } })()
+        }));
+      } catch (_) {}
+    }, 2500);
+  }
+  // Sockets and server-sent events never pass through fetch/XHR, so a login waiting on
+  // one of those looks like "no request at all".
+  try {
+    var OW = window.WebSocket;
+    if (OW) {
+      window.WebSocket = function(u, p) {
+        console.error('FREEDM_WS ' + String(u || '').slice(0, 80));
+        var ws = new OW(u, p);
+        ws.addEventListener('error', function() {
+          console.error('FREEDM_WS_ERR ' + String(u || '').slice(0, 60));
+        });
+        ws.addEventListener('close', function(e) {
+          console.error('FREEDM_WS_CLOSE ' + e.code);
+        });
+        return ws;
+      };
+      window.WebSocket.prototype = OW.prototype;
+    }
+  } catch (_) {}
+  try {
+    var OE = window.EventSource;
+    if (OE) {
+      window.EventSource = function(u, c) {
+        console.error('FREEDM_SSE ' + String(u || '').slice(0, 80));
+        return new OE(u, c);
+      };
+      window.EventSource.prototype = OE.prototype;
+    }
+  } catch (_) {}
+  var of = window.fetch;
+  if (of) {
+    window.fetch = function(input, init) {
+      var url = r(typeof input === 'string' ? input : (input && input.url));
+      var p = of.apply(this, arguments);
+      try {
+        p.then(function(res) {
+          console.error('FREEDM_FETCH ' + JSON.stringify({ u: url, s: res.status }));
+          if (isLogin(url)) {
+            try {
+              res.clone().text().then(function(t) {
+                var k = 'non-json';
+                try {
+                  var o = JSON.parse(t);
+                  k = Array.isArray(o) ? 'array' : Object.keys(o).slice(0, 8).join(',');
+                } catch (_) {}
+                console.error('FREEDM_LOGIN_KEYS ' + k);
+              });
+            } catch (_) {}
+            afterLogin();
+          }
+        }, function(err) {
+          console.error('FREEDM_FETCH_ERR ' + JSON.stringify({
+            u: url, m: String(err && err.message).slice(0, 70)
+          }));
+        });
+      } catch (_) {}
+      return p;
+    };
+  }
+  var oo = XMLHttpRequest.prototype.open;
+  XMLHttpRequest.prototype.open = function(m, u) {
+    var url = r(u);
+    try {
+      this.addEventListener('loadend', function() {
+        console.error('FREEDM_XHR ' + JSON.stringify({
+          u: url, s: this.status, rs: this.readyState
+        }));
+        if (isLogin(url)) {
+          try {
+            var k = 'non-json';
+            var o = JSON.parse(this.responseText);
+            k = Array.isArray(o) ? 'array' : Object.keys(o).slice(0, 8).join(',');
+            if (o && typeof o === 'object') {
+              if ('code' in o) k += ' code=' + o.code;
+              var d = o.data;
+              if (d === null) k += ' data=null';
+              else if (typeof d !== 'object') k += ' data=' + typeof d;
+              else {
+                k += ' data=' + Object.keys(d).slice(0, 10).join('/');
+                if ('biz_code' in d) k += ' biz=' + d.biz_code;
+                if (d.biz_msg) k += ' msg=' + String(d.biz_msg).slice(0, 60);
+                var bd = d.biz_data;
+                k += ' bd=' + (bd && typeof bd === 'object'
+                  ? Object.keys(bd).slice(0, 8).join('/')
+                  : String(bd).slice(0, 40));
+                if (bd && bd.mfa_session_id) {
+                  window.__freedmMfaSid = String(bd.mfa_session_id);
+                  console.error('FREEDM_MFA_REQUIRED ' + window.__freedmMfaSid);
+                }
+              }
+            }
+            console.error('FREEDM_LOGIN_KEYS ' + k.slice(0, 400));
+          } catch (_) {}
+          afterLogin();
+        }
+      });
+      this.addEventListener('error', function() {
+        console.error('FREEDM_XHR_ERR ' + JSON.stringify({ u: url }));
+      });
+    } catch (_) {}
+    return oo.apply(this, arguments);
+  };
+})();
+"""
 
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("SetJavaScriptEnabled")
@@ -169,7 +539,6 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
     val ctx = LocalContext.current
     val prefs = remember { Repo.prefs() }
     val scope = rememberCoroutineScope()
-    val darkUi = isSystemInDarkTheme()
 
     var address by remember { mutableStateOf("") }
     var loading by remember { mutableStateOf(0f) }
@@ -223,11 +592,15 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
     val canGoForward = !showStart &&
         activeEntry != null && activeEntry.cursor < activeEntry.history.lastIndex
 
-    // WebView's own UA, not the download one, and with the `; wv` marker stripped:
-    // that marker tells sites "this is an embedded WebView", and Bing answers it
-    // with a stripped page that renders as a single background image.
+    // WebView's own UA, cleaned of the two markers that give away an embedded
+    // WebView: "; wv" and "Version/4.0". Sites that spot either serve a legacy
+    // branch — the one whose inputs re-set their value on every keystroke (characters
+    // land in reverse) and whose login never finishes. Everything else about the UA
+    // stays real, so page behaviour still matches the engine rendering it.
     val defaultUa = remember {
-        android.webkit.WebSettings.getDefaultUserAgent(ctx).replace("; wv", "")
+        android.webkit.WebSettings.getDefaultUserAgent(ctx)
+            .replace("; wv", "")
+            .replace("Version/4.0 ", "")
     }
 
     fun persistTabs() {
@@ -250,6 +623,12 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
         }
     }
     var sourceText by remember { mutableStateOf<String?>(null) }
+    var cookieImport by remember { mutableStateOf(false) }
+    var cookieText by remember { mutableStateOf("") }
+    // Set when the page reports that the account needs a verification code it never
+    // asks for; drives the two-step dialog below.
+    var mfaSid by remember { mutableStateOf<String?>(null) }
+    var mfaCode by remember { mutableStateOf("") }
     // True between an explicit navigation and the page it lands on. Redirects call
     // `onPageFinished` again with a different URL, and those must replace the entry
     // instead of stacking — otherwise 返回 lands on the same page's redirect.
@@ -355,6 +734,18 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
             showStart = false
             address = target
             webView?.loadUrl(target)
+        }
+    }
+
+    /** Third-party cookies are per-WebView, and the switch can change at runtime. */
+    fun applyCookiePolicy(wv: WebView) {
+        runCatching {
+            val cm = android.webkit.CookieManager.getInstance()
+            cm.setAcceptCookie(true)
+            cm.setAcceptThirdPartyCookies(
+                wv,
+                prefs.getBoolean("third_party_cookies", true),
+            )
         }
     }
 
@@ -652,6 +1043,39 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                         menuOpen = false
                         showMedia = true
                     }
+                    MenuItem("用系统浏览器打开", enabled = address.isNotBlank()) {
+                        menuOpen = false
+                        // Some sites (login + risk control) need a real browser. Hand the
+                        // URL over with this app excluded, so the system picks another one
+                        // instead of bouncing straight back here.
+                        val view = Intent(
+                            Intent.ACTION_VIEW,
+                            android.net.Uri.parse(address),
+                        ).apply {
+                            addCategory(Intent.CATEGORY_BROWSABLE)
+                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                            putExtra(
+                                Intent.EXTRA_EXCLUDE_COMPONENTS,
+                                arrayOf(
+                                    android.content.ComponentName(
+                                        ctx,
+                                        app.freedm.MainActivity::class.java,
+                                    ),
+                                ),
+                            )
+                        }
+                        runCatching { ctx.startActivity(view) }
+                            .onFailure {
+                                Toast.makeText(ctx, "没有其他浏览器", Toast.LENGTH_SHORT).show()
+                            }
+                    }
+                    // For sites whose login cannot finish in a WebView (MFA screens that
+                    // never render), sign in elsewhere and paste the cookies here.
+                    MenuItem("导入 Cookie", enabled = address.isNotBlank()) {
+                        menuOpen = false
+                        cookieText = ""
+                        cookieImport = true
+                    }
                     HorizontalDivider()
                     MenuItem("复制链接", enabled = address.isNotBlank()) {
                         menuOpen = false
@@ -759,7 +1183,13 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
         Box(
             Modifier
                 .weight(1f)
-                .fillMaxWidth(),
+                .fillMaxWidth()
+                // targetSdk 35 puts the window in edge-to-edge, so nothing shrinks when
+                // the keyboard opens unless the app consumes the IME inset itself. Sites
+                // that rely on `interactive-widget=resizes-content` (DeepSeek does) then
+                // lay their fields out for a viewport that is not the real one — the
+                // symptom is a caret that keeps snapping back to position 0.
+                .imePadding(),
         ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
@@ -767,12 +1197,36 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                     WebView(c).apply {
                         settings.javaScriptEnabled = prefs.getBoolean("js_enabled", true)
                         settings.domStorageEnabled = true
+                        settings.databaseEnabled = true
                         settings.userAgentString = if (desktopUa) UA_DESKTOP else defaultUa
-                        settings.loadWithOverviewMode = true
+                        // No overview mode. Forcing the page to fit the screen width means
+                        // the WebView keeps a zoom factor, and a tap on a field is mapped
+                        // through it — when that factor is stale (after the keyboard
+                        // resizes things) the caret lands at position 0. Pages with a
+                        // viewport meta lay themselves out correctly without it.
+                        settings.loadWithOverviewMode = false
                         settings.useWideViewPort = true
-                        // Follow the app theme instead of flashing a white page.
+                        settings.javaScriptCanOpenWindowsAutomatically = true
+                        // Verification / OAuth steps open in a popup; without this the
+                        // window request is silently dropped and the page waits forever.
+                        settings.setSupportMultipleWindows(true)
+                        // Login flows (risk-control widgets, OAuth hops) live on other
+                        // hosts and need their cookies. WebView refuses third-party
+                        // cookies by default, and the symptom is exactly "confirm the
+                        // password, then the dialog just sits there". The policy is
+                        // applied per WebView, so it is re-applied on every page start
+                        // too — the switch can change while this screen stays composed.
+                        applyCookiePolicy(this)
+                        // Login pages routinely pull http subresources; blocking them
+                        // silently leaves a half-rendered dialog.
+                        settings.mixedContentMode =
+                            android.webkit.WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
+                        // No forced darkening. It re-colours pages that ship their own
+                        // theme and turns translucent overlays (a login spinner mask)
+                        // into a grey blur. The transparent background already stops the
+                        // white flash, which was the reason it was turned on.
                         if (android.os.Build.VERSION.SDK_INT >= 33) {
-                            settings.isAlgorithmicDarkeningAllowed = darkUi
+                            settings.isAlgorithmicDarkeningAllowed = false
                         }
                         setBackgroundColor(android.graphics.Color.TRANSPARENT)
 
@@ -809,6 +1263,45 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                                 loading = newProgress / 100f
                             }
 
+                            /**
+                             * `window.open` is how login/verification flows usually show
+                             * their second step. Without multi-window support the call
+                             * returns null: the page dims itself and waits forever for a
+                             * window that never appears — exactly "a blurry screen with no
+                             * verification UI on it".
+                             *
+                             * The popup target is loaded in this same WebView instead of a
+                             * second one; the flow completes on a real page, and pages that
+                             * insist on talking through `window.opener` would need a second
+                             * WebView (not wired up yet).
+                             */
+                            override fun onCreateWindow(
+                                view: WebView?,
+                                isDialog: Boolean,
+                                isUserGesture: Boolean,
+                                resultMsg: android.os.Message?,
+                            ): Boolean {
+                                val host = view ?: return false
+                                val probe = WebView(host.context)
+                                probe.webViewClient = object : WebViewClient() {
+                                    override fun shouldOverrideUrlLoading(
+                                        v: WebView?,
+                                        request: WebResourceRequest?,
+                                    ): Boolean {
+                                        val u = request?.url?.toString() ?: return false
+                                        Diag.log("WINDOW_OPEN", u.take(90))
+                                        showStart = false
+                                        freshNav = true
+                                        host.loadUrl(u)
+                                        probe.destroy()
+                                        return true
+                                    }
+                                }
+                                (resultMsg?.obj as? WebView.WebViewTransport)?.webView = probe
+                                resultMsg?.sendToTarget()
+                                return true
+                            }
+
                             // The real source of a tab's title. Reading `view.title`
                             // inside onPageFinished picks up the *previous* page's
                             // title, which is how a tab ended up labelled
@@ -820,6 +1313,56 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                                 if (cur.url.isBlank() || cur.title == clean) return
                                 tabs[activeTab] = cur.copy(title = clean)
                                 persistTabs()
+                            }
+
+                            // Page-side failures are invisible from the app otherwise,
+                            // and a login that "just stops" is usually one of these.
+                            // Only errors: warnings from big sites fill the log.
+                            override fun onConsoleMessage(msg: android.webkit.ConsoleMessage?): Boolean {
+                                if (msg == null) return true
+                                val level = msg.messageLevel()
+                                if (level == android.webkit.ConsoleMessage.MessageLevel.ERROR ||
+                                    level == android.webkit.ConsoleMessage.MessageLevel.TIP
+                                ) {
+                                    val body = msg.message()
+                                    // Our own probes carry the useful payload; keep them whole.
+                                    val limit = if (body.startsWith("FREEDM_")) 900 else 160
+                                    Diag.log(
+                                        "PAGE_JS",
+                                        "host=${AdBlocker.hostOf(address).orEmpty()} " +
+                                            "level=$level line=${msg.lineNumber()} " +
+                                            body.take(limit),
+                                    )
+                                    // The page asked for a code and then abandoned it.
+                                    when {
+                                        body.startsWith("FREEDM_MFA_REQUIRED ") -> {
+                                            mfaSid = body.removePrefix("FREEDM_MFA_REQUIRED ").trim()
+                                            mfaCode = ""
+                                        }
+
+                                        body.startsWith("FREEDM_MFA_SEND ") ->
+                                            Toast.makeText(
+                                                ctx,
+                                                when {
+                                                    body.contains("\"code\":0") &&
+                                                        !body.contains("\"biz\":0") &&
+                                                        !body.contains("\"biz\":null") ->
+                                                        "发送失败"
+                                                    else -> "验证码已发送"
+                                                },
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+
+                                        body.startsWith("FREEDM_MFA_CHECK ") ->
+                                            Toast.makeText(
+                                                ctx,
+                                                if (body.contains("\"code\":0")) "验证通过"
+                                                else "验证码不对或已过期",
+                                                Toast.LENGTH_SHORT,
+                                            ).show()
+                                    }
+                                }
+                                return true
                             }
                         }
 
@@ -863,6 +1406,7 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                                 sniffNetCount.set(0)
                                 resCount.set(0)
                                 blockedAtStart.set(AdBlocker.blockedCount())
+                                v?.let { applyCookiePolicy(it) }
                                 media.clear()
                                 sniffQueue.clear()
                                 if (!blank) Diag.log("PAGE_START", pageHost.get().orEmpty())
@@ -950,6 +1494,26 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
                                     val parsed = Sniffer.parseProbeResult(raw)
                                     Diag.log("SNIFF_DOM", "raw=${raw?.length ?: -1} parsed=${parsed.size}")
                                     absorb(parsed)
+                                }
+                                // What the page sees: the UA it was served (proves the
+                                // WebView markers are gone), its viewport meta, and the
+                                // kind of field on it. Enough to tell a site-side legacy
+                                // branch apart from a WebView layout problem.
+                                v.evaluateJavascript(PAGE_ENV_JS) { raw ->
+                                    Diag.log("PAGE_ENV", raw?.take(240).orEmpty())
+                                }
+                                // Only while diagnostics are on — it hooks every field
+                                // on the page, which is not something to leave running.
+                                // Always on: these three are fixes, not diagnostics.
+                                // The first repairs a WebView caret bug that makes typed
+                                // characters arrive in reverse; the other two finish logins
+                                // the page itself gives up on.
+                                v.evaluateJavascript(INPUT_FIX_JS, null)
+                                v.evaluateJavascript(PENDING_GUARD_JS, null)
+                                v.evaluateJavascript(MFA_BRIDGE_JS, null)
+                                if (prefs.getBoolean("diag_log", true)) {
+                                    v.evaluateJavascript(NET_PROBE_JS, null)
+                                    v.evaluateJavascript(MFA_CALL_JS, null)
                                 }
                             }
 
@@ -1058,6 +1622,106 @@ fun BrowseScreen(onOpenHistory: () -> Unit = {}) {
             },
             dismissButton = {
                 TextButton(onClick = { sourceText = null }) { Text("关闭") }
+            },
+        )
+    }
+
+    if (cookieImport) {
+        AlertDialog(
+            onDismissRequest = { cookieImport = false },
+            title = { Text("导入 Cookie") },
+            text = {
+                Column {
+                    Text(
+                        "从浏览器的开发者工具里复制本站的 Cookie，粘到这里。" +
+                            "形如 a=1; b=2，换行也可以。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = cookieText,
+                        onValueChange = { cookieText = it },
+                        label = { Text("Cookie") },
+                        minLines = 3,
+                        maxLines = 8,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = cookieText.isNotBlank(),
+                    onClick = {
+                        val host = AdBlocker.hostOf(address)
+                        val cm = android.webkit.CookieManager.getInstance()
+                        if (host != null) {
+                            cookieText
+                                .split(';', '\n')
+                                .map { it.trim() }
+                                .filter { it.contains('=') && !it.startsWith('#') }
+                                .forEach { pair ->
+                                    runCatching {
+                                        cm.setCookie("https://$host", "$pair; Path=/")
+                                    }
+                                }
+                            runCatching { cm.flush() }
+                            Diag.log(
+                                "COOKIE_IMPORT",
+                                "host=$host pairs=${cookieText.count { it == '=' }}",
+                            )
+                        }
+                        cookieImport = false
+                        webView?.reload()
+                    },
+                ) { Text("导入并刷新") }
+            },
+            dismissButton = {
+                TextButton(onClick = { cookieImport = false }) { Text("取消") }
+            },
+        )
+    }
+
+    // Two-step verification for accounts the site refuses to show a code box for.
+    val sid = mfaSid
+    if (sid != null) {
+        AlertDialog(
+            onDismissRequest = { mfaSid = null },
+            title = { Text("两步验证") },
+            text = {
+                Column {
+                    Text(
+                        "这个账号开了两步验证。填写之前收到的那条验证码即可；" +
+                            "App 里发不出去（发送需要人机验证令牌，只有网页自己能拿）。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = mfaCode,
+                        onValueChange = { mfaCode = it },
+                        label = { Text("验证码") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            },
+            confirmButton = {
+                // Digits and letters only: the value is inlined into a JS call.
+                val clean = mfaCode.filter { it.isLetterOrDigit() }
+                TextButton(
+                    enabled = clean.isNotEmpty(),
+                    onClick = {
+                        webView?.evaluateJavascript(
+                            "window.__freedmMfaCheck && window.__freedmMfaCheck('$clean')",
+                            null,
+                        )
+                    },
+                ) { Text("验证") }
+            },
+            dismissButton = {
+                TextButton(onClick = { mfaSid = null }) { Text("取消") }
             },
         )
     }

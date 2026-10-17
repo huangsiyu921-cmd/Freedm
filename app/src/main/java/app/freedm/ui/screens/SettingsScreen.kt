@@ -67,6 +67,11 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
     var adblock by remember { mutableStateOf(AdBlocker.isEnabled()) }
     var desktopUa by remember { mutableStateOf(prefs.getBoolean("desktop_ua", false)) }
     var jsEnabled by remember { mutableStateOf(prefs.getBoolean("js_enabled", true)) }
+    // On by default: login and captcha flows need it, and WebView's own default
+    // (off) is what silently broke them.
+    var thirdPartyCookies by remember {
+        mutableStateOf(prefs.getBoolean("third_party_cookies", true))
+    }
     var rememberPage by remember { mutableStateOf(prefs.getBoolean("remember_page", false)) }
     var clipWatch by remember { mutableStateOf(prefs.getBoolean("clipboard_watch", false)) }
     var themeMode by remember { mutableStateOf(prefs.getString(THEME_MODE, "system") ?: "system") }
@@ -394,6 +399,17 @@ fun SettingsScreen(onOpenPrivacy: () -> Unit, onOpenSiteData: () -> Unit) {
                     onChange = {
                         jsEnabled = it
                         prefs.edit().putBoolean("js_enabled", it).apply()
+                    },
+                )
+            }
+            item {
+                SwitchRow(
+                    label = "允许第三方 Cookie",
+                    description = "登录、验证码这类页面需要；关掉可能登不上",
+                    checked = thirdPartyCookies,
+                    onChange = {
+                        thirdPartyCookies = it
+                        prefs.edit().putBoolean("third_party_cookies", it).apply()
                     },
                 )
             }
