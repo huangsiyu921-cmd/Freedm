@@ -16,16 +16,16 @@ object Prober {
     private const val TIMEOUT = 20_000
 
     fun probe(rawUrl: String): ProbeResult {
-        var conn = open(rawUrl, "HEAD", null)
+        var conn = openFollowing(rawUrl, "HEAD")
         try {
             var code = conn.responseCode
             if (code !in 200..299) {
                 conn.disconnect()
                 // Plenty of CDNs reject HEAD; fall back to a 1-byte ranged GET.
-                conn = open(rawUrl, "GET", "bytes=0-0")
+                conn = openFollowing(rawUrl, "GET") { it.setRequestProperty("Range", "bytes=0-0") }
                 code = conn.responseCode
             }
-            if (code !in 200..399) error("HTTP $code")
+            if (code !in 200..299) error("HTTP $code")
 
             val contentRange = conn.getHeaderField("Content-Range")
             val acceptRanges = conn.getHeaderField("Accept-Ranges")?.contains("bytes", true) == true ||
@@ -58,16 +58,44 @@ object Prober {
         }
     }
 
-    private fun open(url: String, method: String, range: String?): HttpURLConnection {
-        val c = URL(url).openConnection() as HttpURLConnection
-        c.requestMethod = method
-        c.instanceFollowRedirects = true
-        c.connectTimeout = TIMEOUT
-        c.readTimeout = TIMEOUT
-        c.setRequestProperty("User-Agent", UA)
-        if (range != null) c.setRequestProperty("Range", range)
-        return c
+    /**
+     * Opens [url], following redirects **by hand**.
+     *
+     * `setInstanceFollowRedirects(true)` silently gives up on cross-protocol
+     * (http↔https) and some cross-host redirects — exactly what mirror sites do.
+     * Without this the caller sees a bare "HTTP 302" and the task fails, even
+     * though the file is perfectly downloadable.
+     */
+    fun openFollowing(
+        url: String,
+        method: String,
+        connectTimeout: Int = TIMEOUT,
+        readTimeout: Int = TIMEOUT,
+        configure: (HttpURLConnection) -> Unit = {},
+    ): HttpURLConnection {
+        var current = url
+        var hops = 0
+        while (true) {
+            val c = URL(current).openConnection() as HttpURLConnection
+            c.requestMethod = method
+            c.instanceFollowRedirects = false
+            c.connectTimeout = connectTimeout
+            c.readTimeout = readTimeout
+            c.setRequestProperty("User-Agent", UA)
+            configure(c)
+            val code = c.responseCode
+            val location = c.getHeaderField("Location")
+            if (code in 300..399 && !location.isNullOrBlank() && hops < MAX_REDIRECTS) {
+                c.disconnect()
+                current = URL(URL(current), location).toString()
+                hops++
+                continue
+            }
+            return c
+        }
     }
+
+    private const val MAX_REDIRECTS = 5
 
     const val UA =
         "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) " +

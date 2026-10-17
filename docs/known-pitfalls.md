@@ -293,3 +293,85 @@ Compose 状态；而且每个资源请求都塞一条，永不回收。
 `if (bytes.size > 512 * 1024) return null` 只是事后诸葛亮。
 
 **处理**：边读边计数，超限立刻放弃（`FaviconColor.MAX_ICON_BYTES = 512 KiB`）。
+
+---
+
+## 22. 数据库升级不能 `DROP TABLE`
+
+**现象**：`onUpgrade` 是 `DROP TABLE …; onCreate(db)`，注释写着"未发布版本不写迁移"。
+
+**风险**：项目已经发布了。哪天把 `Db.VERSION` 从 1 改成 2，用户所有下载记录**静默消失**，
+不崩溃、不报错、无提示 —— 这是最难被发现的一类数据丢失。
+
+**处理**：`onUpgrade`/`onDowngrade` 都改成空实现 + 注释模板，永不 DROP。真要加列时：
+
+```kotlin
+if (oldVersion < 2) db.execSQL("ALTER TABLE download ADD COLUMN <col> <type>")
+// 同时在 onCreate 里镜像同一列，保证全新安装与升级安装 schema 一致
+```
+
+---
+
+## 23. `HttpURLConnection` 不会跟随跨 host / 跨协议 302
+
+**现象**：镜像站（如 `mirrors.aliyun.com`）返回 302，任务三次重试后 `TASK_FAIL`，日志只有
+`IOException: HTTP 302`；探测还把 302 响应的 `Content-Length`（实测 215 B）当成文件大小。
+
+**原因**：`setInstanceFollowRedirects(true)` 对跨协议（http↔https）与部分跨 host 重定向
+**静默放弃**。
+
+**处理**：`Prober.openFollowing()` 手工跟随（≤5 跳，`Location` 相对/绝对都支持），
+每次跳转重新应用 `Range` / `If-Range`。探测与 `fetchSegment` 共用。
+实测能跟到重定向目标；若目标本身是 `http://`，仍会被系统的明文策略拒绝（见 §20.4 缺口 6）。
+
+---
+
+## 24. `SocketTimeoutException` 是 `InterruptedIOException` 的子类
+
+**现象**：弱网 / VPN 抖动时下载"停住不动"，状态却是 `PAUSED`，没有任何提示。
+
+**原因**：暂停判定写的是 `e is InterruptedIOException`，而 `SocketTimeoutException` 正好继承它。
+读超时于是被解释成"用户点了暂停"，抛 `CancellationException`，任务静默停在暂停态。
+
+**处理**：
+
+```kotlin
+if (Thread.currentThread().isInterrupted ||
+    (e is InterruptedIOException && e !is java.net.SocketTimeoutException)
+) throw CancellationException("paused")
+```
+
+---
+
+## 25. 断网应该"等待"，不该"失败"
+
+**原因**：`fetchSegment` 重试 3 次（1s/2s/4s）就整任务 `FAILED`，而"仅 Wi-Fi"却是
+`PAUSED` + 自动恢复 —— 同样是没网，两种结局。
+
+**处理**：连接类异常（`UnknownHost`/`Connect`/`Socket`/`SocketTimeout`）且
+`!hasInternet()` 时抛内部 `NetworkWait`，**不消耗重试**，`runTask` 置
+`PAUSED + NET_WAIT("等待网络")`；`NetworkWatcher.onAvailable` 同时恢复 `WIFI_WAIT` 与 `NET_WAIT`。
+
+实测：3.99 MB 处断网 → `PAUSED / 等待网络`；恢复后 `NET_AVAILABLE waiting=1` → 续传 → `COMPLETED`。
+
+---
+
+## 26. 文件被外部删除后，续传锚点会写坏文件
+
+**原因**：`segment.downloaded` 还在，但 `RandomAccessFile` 打开的是新建的空文件；
+`setLength` 预分配后从旧偏移续写，前面那段就是空洞。
+
+**处理**：打开文件后先比较 `raf.length() < Σ segment.downloaded` → 记 `TASK_FILE_LOST`、
+重建分片计划、从段首重下。
+
+---
+
+## 27. 服务重启时 `Repo` 还没初始化
+
+**现象**：`START_STICKY` 重启的服务里，任务停在 `QUEUED` 没人驱动。
+
+**原因**：初始化（`Repo.init`）只在 `MainActivity.onCreate` 里做；只有服务被重启的进程里
+根本没有 Activity 跑过，`Repo` 的 `lateinit` 还是空的。
+
+**处理**：新增 `FreedmApp : Application`，在 `onCreate` 里 `Repo.init` + `Diag.init`；
+`DownloadService.onStartCommand` 的默认分支补 `Engine.pump()`。

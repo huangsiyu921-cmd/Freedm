@@ -33,9 +33,10 @@ object NetworkWatcher {
             cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) {
                     val waiting = Repo.tasks.value.filter {
-                        it.state == TaskState.PAUSED && it.error == Engine.WIFI_WAIT
+                        it.state == TaskState.PAUSED &&
+                            (it.error == Engine.WIFI_WAIT || it.error == Engine.NET_WAIT)
                     }
-                    Diag.log("NET_AVAILABLE", "wifiWaiting=${waiting.size}")
+                    Diag.log("NET_AVAILABLE", "waiting=${waiting.size}")
                     if (waiting.isEmpty()) return
                     waiting.forEach { Repo.setState(it.id, TaskState.QUEUED) }
                     DownloadService.start(app)

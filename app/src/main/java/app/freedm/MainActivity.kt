@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import app.freedm.data.Repo
-import app.freedm.diag.Diag
 import app.freedm.ui.ShareBus
 import app.freedm.ui.firstUrl
 import app.freedm.ui.screens.BrowseScreen
@@ -93,9 +92,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Repo.init(this)
-        Diag.init(this)
-        Diag.log("APP_START", "sdk=${Build.VERSION.SDK_INT}")
+        // Repo / Diag are initialised in FreedmApp, so a process that was restarted
+        // only to run the download service also has working state.
         consumeIntent(intent)
         app.freedm.engine.NetworkWatcher.start(this)
 

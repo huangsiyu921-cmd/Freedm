@@ -30,8 +30,6 @@ import java.io.File
 import java.io.InterruptedIOException
 import java.io.IOException
 import java.io.RandomAccessFile
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
@@ -217,21 +215,9 @@ object Engine {
 
         // 3) Build the plan on first run; re-read so every Segment carries its row id.
         if (Repo.loadSegments(id).isEmpty()) {
-            val total = task.totalBytes
-            val fresh = if (task.segmented && total > 0) {
-                Repo.buildPlan(total, task.threadCount)
-            } else {
-                listOf(
-                    Segment(
-                        0, id, 0, 0,
-                        if (total > 0) total - 1 else Long.MAX_VALUE,
-                        0, TaskState.QUEUED,
-                    ),
-                )
-            }
-            Repo.planSegments(id, fresh)
+            Repo.planSegments(id, freshPlan(task))
         }
-        val plan = Repo.loadSegments(id)
+        var plan = Repo.loadSegments(id)
 
         if (task.wifiOnly && !onWifi()) {
             Diag.log("TASK_WIFI_WAIT", "id=$id")
@@ -240,8 +226,25 @@ object Engine {
         }
 
         // 4) Reserve the output file up front so all segments can seek freely.
+        if (task.totalBytes > 0) {
+            val missing = task.totalBytes - (if (file.exists()) file.length() else 0L)
+            val free = runCatching { dir.usableSpace }.getOrDefault(-1L)
+            if (missing > 0 && free in 1 until missing) {
+                // Fails before the first byte instead of halfway through a 10 GB file.
+                error("空间不足（需 ${fmtBytes(missing)}，剩 ${fmtBytes(free)}）")
+            }
+        }
         val raf = RandomAccessFile(file, "rw")
         try {
+            // The file may have been removed or truncated behind our back (cleanup
+            // tool, manual delete, storage migration). The segment anchors then point
+            // past the end of the fresh empty file, which would corrupt it — start over.
+            val claimed = plan.sumOf { it.downloaded }
+            if (claimed > 0 && raf.length() < claimed) {
+                Diag.log("TASK_FILE_LOST", "id=$id onDisk=${raf.length()} claimed=$claimed")
+                Repo.planSegments(id, freshPlan(task))
+                plan = Repo.loadSegments(id)
+            }
             if (task.totalBytes > 0 && raf.length() < task.totalBytes) raf.setLength(task.totalBytes)
 
             // One mutable counter per segment: the resume anchor.
@@ -304,6 +307,12 @@ object Engine {
                         }
                     }
                 }
+            } catch (e: NetworkWait) {
+                // Park instead of failing: the network callback resumes it, the same
+                // way the "Wi-Fi only" constraint does.
+                Diag.log("TASK_NET_WAIT", "id=$id")
+                Repo.setState(id, TaskState.PAUSED, NET_WAIT)
+                return
             } finally {
                 ticker.cancel()
             }
@@ -360,13 +369,16 @@ object Engine {
 
                 val from = seg.startByte + written.get()
                 val rangedRequest = seg.endByte != Long.MAX_VALUE
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = 20_000
-                    readTimeout = 30_000
-                    instanceFollowRedirects = true
-                    setRequestProperty("User-Agent", Prober.UA)
-                    if (rangedRequest) setRequestProperty("Range", "bytes=$from-${seg.endByte}")
-                    if (task.etag != null) setRequestProperty("If-Range", task.etag)
+                // Hand-rolled redirects: mirrors answer with a 302 to a CDN, which
+                // HttpURLConnection's own follower refuses across protocols/hosts.
+                val conn = Prober.openFollowing(
+                    url,
+                    "GET",
+                    connectTimeout = 20_000,
+                    readTimeout = 30_000,
+                ) { c ->
+                    if (rangedRequest) c.setRequestProperty("Range", "bytes=$from-${seg.endByte}")
+                    if (task.etag != null) c.setRequestProperty("If-Range", task.etag)
                 }
                 try {
                     val code = conn.responseCode
@@ -416,9 +428,18 @@ object Engine {
                 Repo.markSegment(taskId, seg.index, written.get(), TaskState.QUEUED)
                 // A pause surfaces here as an interrupt: propagate it instead of
                 // retrying, otherwise the segment would restart on its own.
-                if (e is InterruptedIOException || Thread.currentThread().isInterrupted) {
+                // SocketTimeoutException is *also* an InterruptedIOException, so it
+                // must be excluded — otherwise a VPN hiccup reads as "user paused"
+                // and the task silently parks itself.
+                if (Thread.currentThread().isInterrupted ||
+                    (e is InterruptedIOException && e !is java.net.SocketTimeoutException)
+                ) {
                     throw CancellationException("paused")
                 }
+                // No network at all: burning the three retries would only turn
+                // "wait a moment" into a red failed task. Park it and let the
+                // network callback (§7) pick it up again.
+                if (!hasInternet() && e.isConnectionLevel()) throw NetworkWait()
                 Diag.log(
                     "SEG_RETRY",
                     "id=$taskId seg=${seg.index} attempt=$attempt " +
@@ -440,10 +461,63 @@ object Engine {
             caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
     }
 
+    /** True when the default network claims internet access. */
+    private fun hasInternet(): Boolean {
+        val cm = Repo.context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+            ?: return true
+        val caps = cm.getNetworkCapabilities(cm.activeNetwork) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    /** Failures that mean "the link is gone", not "this server said no". */
+    private fun Throwable.isConnectionLevel(): Boolean = when (this) {
+        is java.net.UnknownHostException,
+        is java.net.ConnectException,
+        is java.net.SocketException,
+        is java.net.SocketTimeoutException,
+        -> true
+
+        else -> false
+    }
+
+    /** Segment plan for a task that has no usable rows yet (first run, or reset). */
+    private fun freshPlan(task: DownloadTask): List<Segment> {
+        val total = task.totalBytes
+        return if (task.segmented && total > 0) {
+            Repo.buildPlan(total, task.threadCount)
+        } else {
+            listOf(
+                Segment(
+                    0, task.id, 0, 0,
+                    if (total > 0) total - 1 else Long.MAX_VALUE,
+                    0, TaskState.QUEUED,
+                ),
+            )
+        }
+    }
+
+    /** Thrown when the task should wait for a network instead of spending retries. */
+    private class NetworkWait : Exception("network unavailable")
+
+    private fun fmtBytes(bytes: Long): String {
+        if (bytes < 1024) return "$bytes B"
+        val units = listOf("KB", "MB", "GB", "TB")
+        var v = bytes.toDouble() / 1024
+        var i = 0
+        while (v >= 1024 && i < units.lastIndex) {
+            v /= 1024
+            i++
+        }
+        return if (v >= 100) "${v.toInt()} ${units[i]}" else String.format("%.1f %s", v, units[i])
+    }
+
     private const val MAX_RETRY = 3
     private const val BUF_SIZE = 64 * 1024
     const val ONE_MIB = 1024L * 1024L
 
     /** Marker stored in `download.error` when a task paused itself for Wi-Fi. */
     const val WIFI_WAIT = "等待 Wi-Fi"
+
+    /** Marker stored in `download.error` when a task paused itself for a network. */
+    const val NET_WAIT = "等待网络"
 }

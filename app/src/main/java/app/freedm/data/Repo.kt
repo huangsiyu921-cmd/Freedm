@@ -131,11 +131,15 @@ object Repo {
         } else {
             dirPath
         }
+        // Two tasks created at the same moment can resolve to the same name (the
+        // probe answers identically for both). The disk check at the call site
+        // cannot see the other task, so arbitrate against the DB here.
+        val uniqueName = uniqueName(targetDir, fileName)
         val t = DownloadTask(
             id = 0,
             url = url,
             finalUrl = probe?.finalUrl,
-            fileName = fileName,
+            fileName = uniqueName,
             dirPath = targetDir,
             totalBytes = probe?.totalBytes ?: -1,
             downloaded = 0,
@@ -155,6 +159,33 @@ object Repo {
         }
         refresh()
         return id
+    }
+
+    /** True when a task that is not finished yet already claims this path. */
+    fun nameInUse(dirPath: String, fileName: String): Boolean = synchronized(lock) {
+        helper.readableDatabase.rawQuery(
+            "SELECT 1 FROM download WHERE dir_path=? AND file_name=? " +
+                "AND state IN (?,?,?) LIMIT 1",
+            arrayOf(
+                dirPath, fileName,
+                TaskState.QUEUED.name, TaskState.RUNNING.name, TaskState.PAUSED.name,
+            ),
+        ).use { it.moveToFirst() }
+    }
+
+    /** Appends " (1)", " (2)" … until neither the DB nor the caller's name is taken. */
+    private fun uniqueName(dirPath: String, fileName: String): String {
+        if (!nameInUse(dirPath, fileName)) return fileName
+        val dot = fileName.lastIndexOf('.')
+        val stem = if (dot > 0) fileName.substring(0, dot) else fileName
+        val ext = if (dot > 0) fileName.substring(dot) else ""
+        var i = 1
+        while (i < 1000) {
+            val candidate = "$stem ($i)$ext"
+            if (!nameInUse(dirPath, candidate)) return candidate
+            i++
+        }
+        return "$stem-$i$ext"
     }
 
     fun update(t: DownloadTask) {

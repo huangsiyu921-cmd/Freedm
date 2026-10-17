@@ -52,10 +52,26 @@ class Db(context: Context) : SQLiteOpenHelper(context.applicationContext, NAME, 
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-        // Pre-release schema: drop and recreate.
-        db.execSQL("DROP TABLE IF EXISTS segment")
-        db.execSQL("DROP TABLE IF EXISTS download")
-        onCreate(db)
+        // Schema history:
+        //   1 — download / segment (current)
+        //
+        // **Never drop tables here.** The app is published, so an upgrade that
+        // recreates the schema would silently wipe every download record.
+        // When a column is really added, write it as an explicit branch:
+        //
+        //   if (oldVersion < 2) {
+        //       db.execSQL("ALTER TABLE download ADD COLUMN <col> <type>")
+        //       // mirror the same column in onCreate, so a fresh install and an
+        //       // upgraded install end up with identical schemas
+        //   }
+        //
+        // Until such a change exists there is nothing to migrate, and doing
+        // nothing is the correct behaviour: every row survives.
+    }
+
+    override fun onDowngrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        // Same rule as onUpgrade: an older build must not delete the user's data.
+        // The extra columns an older build does not know about are simply ignored.
     }
 
     override fun onConfigure(db: SQLiteDatabase) {

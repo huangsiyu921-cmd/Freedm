@@ -802,11 +802,11 @@ parseProbeResult(raw):
 shouldInterceptRequest(request):            // WebView 线程，不是主线程
     if (request == null) ⊥ null
     u ← request.url
-    if (!isForMainFrame && AdBlocker.shouldBlock(u, pageHost)) → 空响应（见 §19）
+    if (!isForMainFrame && AdBlocker.shouldBlock(u, pageHost)) → 空响应（见 §18）
     if (!prefs["sniff"]) ⊥ null
     kind ← kindOf(u, null)
     if (kind ≠ FILE) sniffQueue.add(媒体候选)      // 线程安全队列，不碰 Compose 状态
-    ⊥ null（永不拦截请求本身，广告例外见 §19）
+    ⊥ null（永不拦截请求本身，广告例外见 §18）
 
 主线程（500 ms 循环）:
     drain sniffQueue → absorb(batch) ; 同步拦截计数
@@ -1136,12 +1136,12 @@ m ← 正则 https?://[^\s"'<>]+ 的第一个匹配
 
 ---
 
-# 第 16 部分 · 分段进度条（作为列表行背景）
+# 第 15 部分 · 分段进度条（作为列表行背景）
 
 > 目标视觉：进度**铺满整个行**，而不是一条细进度条。
 > 已完成行呈现整片纯色；下载中行呈现多条竖向色带，带之间有一条细缝。
 
-## 16.1 几何算法（可直接照着写）
+## 15.1 几何算法（可直接照着写）
 
 ```
 W = 行宽    H = 行高    n = 分片数
@@ -1171,14 +1171,14 @@ else:
    所以 `p == 1` 时右边界会比段边界多出 1 px。这是刻意保留的：若减去，
    满段与未满段之间会出现 2 px 的宽缝，看起来像断开了。
 
-## 16.2 为什么会"无缝"和"有缝"两种分支
+## 15.2 为什么会"无缝"和"有缝"两种分支
 
 - **全部完成**：所有 `percents[i] == 1`，除第一段外每段都满足 `percents[i-1] >= 1`，
   于是全部走无缝分支，矩形首尾相接 → **整行一片纯色**。
 - **下载中**：各段进度参差，未满段只填前面一截，段起点又留缝 → **断续色带**。
 - **单段**：退化为普通水平条。
 
-## 16.3 数据来源
+## 15.3 数据来源
 
 ```
 分片模式（n > 1）：Engine.progress[taskId].segmentPercents
@@ -1198,7 +1198,7 @@ for each seg in plan:
     pct = (len > 0) ? clamp(written[seg] / len, 0, 1) : 0
 ```
 
-## 16.4 行内布局（与进度同一层）
+## 15.4 行内布局（与进度同一层）
 
 进度是**行容器的背景层**，内容叠在它上面（不是放在内容下面的一根条）：
 
@@ -1219,7 +1219,7 @@ Box(clip 12dp 圆角, minHeight 64dp)
 文字颜色跟随进度色对比：已完成行用 `onPrimary`，其余用 `onSurface`。
 未下载部分的底色用 `surfaceVariant`。
 
-## 16.5 边界
+## 15.5 边界
 
 | 情况 | 处理 |
 |---|---|
@@ -1231,19 +1231,19 @@ Box(clip 12dp 圆角, minHeight 64dp)
 | 段长未知（`endByte` 为哨兵） | 该段进度记 0，整任务退化为单段显示 |
 | 已完成任务 | 直接 `n = 1, overall = 1`，不必逐段算 |
 
-## 16.6 可配置项（原产品做法，重建可选）
+## 15.6 可配置项（原产品做法，重建可选）
 
 原产品有个"显示分片进度"总开关：关掉后强制 `n = 1`，退化为普通进度条。
 重建时若实现该开关，语义应为**纯显示层**——不影响下载本身的分片行为。
 
 ---
 
-# 第 17 部分 · 多选下载确认（候选列表）
+# 第 16 部分 · 多选下载确认（候选列表）
 
 > 场景：内置浏览器嗅探到多个媒体后，用户需要**看着候选列表挑几个**批量下载，
 > 而不是逐个点。
 
-## 17.1 状态
+## 16.1 状态
 
 ```
 selected: List<String>        // 元素是 SniffedMedia.key（规范化 URL），不是下标
@@ -1252,7 +1252,7 @@ media:    List<SniffedMedia>  // 候选，按嗅探到达顺序
 
 用 **key 而非下标**标识选中项：列表会因新嗅探结果追加而变化，下标会失效。
 
-## 17.2 交互规则
+## 16.2 交互规则
 
 | 动作 | 行为 |
 |---|---|
@@ -1263,7 +1263,7 @@ media:    List<SniffedMedia>  // 候选，按嗅探到达顺序
 | 「关闭」 | 收起面板并清空选中 |
 | 页面重新扫描 / 回到起始页 | 清空 `media` 与 `selected` |
 
-## 17.3 汇总行
+## 16.3 汇总行
 
 标题下方一行小字，随选择变化：
 
@@ -1276,7 +1276,7 @@ media:    List<SniffedMedia>  // 候选，按嗅探到达顺序
 - `sizeHint <= 0` 视为未知，单独计数，**不并入合计**（并入会显示成 0 B，误导用户）。
 - 只有部分已知时，两个信息都要给出来。
 
-## 17.4 批量创建流程
+## 16.4 批量创建流程
 
 ```
 addSelected():
@@ -1305,7 +1305,7 @@ addSelected():
    失败也照样 `create`（`totalBytes = -1`，下载时再探测）。
 3. **Toast 报成功数**，不是选中数。用户要知道有几项真的进去了。
 
-## 17.5 与原产品的取舍差异
+## 16.5 与原产品的取舍差异
 
 | 项 | 原产品 | 本实现 | 理由 |
 |---|---|---|---|
@@ -1315,7 +1315,7 @@ addSelected():
 | 大小未知标记 | 无 | **有** | 避免把"未知"当成 0 B |
 | 单条快捷 | 点条目直接下载 | 点条目 = 选中 | 与「批量」心智一致；只选一个就是单条 |
 
-## 17.6 边界
+## 16.6 边界
 
 | 情况 | 处理 |
 |---|---|
@@ -1328,11 +1328,11 @@ addSelected():
 
 ---
 
-# 第 18 部分 · 文件类型识别与目录归档
+# 第 17 部分 · 文件类型识别与目录归档
 
 > 两个能力：**认出这是什么文件**（决定图标），以及**该放进哪个目录**（可选归档）。
 
-## 18.1 类型枚举
+## 17.1 类型枚举
 
 ```
 FileKind(folder: String) {
@@ -1346,7 +1346,7 @@ FileKind(folder: String) {
 
 `folder` 是归档时的子目录名（英文，避免跨语言不一致）。
 
-## 18.2 判定顺序 `FileKinds.of(fileName, mime)`
+## 17.2 判定顺序 `FileKinds.of(fileName, mime)`
 
 ```
 ext ← 文件名最后一个 '.' 之后，转小写
@@ -1385,7 +1385,7 @@ MIME 回落（ext 认不出或缺失时）：
 | 音频在视频**之前** | `.m4a`/`.mp4` 同源，靠集合内容区分；顺序反了会把部分音频判成视频 |
 | 镜像单独判 OTHER | `iso`/`img`/`bin` 里 `bin` 与程序集重叠，必须在程序之前处理才不会被判成可执行 |
 
-## 18.3 图标映射
+## 17.3 图标映射
 
 ```
 VIDEO → ic_kind_video      MUSIC → ic_kind_music
@@ -1397,7 +1397,7 @@ OTHER → ic_file（通用）
 
 全部是单色 vector，由 `Icon(tint = …)` 着色，跟随行的前景色——不额外准备深/浅两套。
 
-## 18.4 自动归档的接线点
+## 17.4 自动归档的接线点
 
 **只改一处**：`Repo.create()`。
 
@@ -1417,7 +1417,7 @@ Repo.create(url, fileName, dirPath, threads, wifiOnly, probe):
 - 所有创建任务的入口（手动添加 / 嗅探批量 / 保存网页 / 重新下载）自动统一；
 - 归档只影响**新任务**，已存在任务的 `dirPath` 不被改写。
 
-## 18.5 边界
+## 17.5 边界
 
 | 情况 | 行为 |
 |---|---|
@@ -1434,11 +1434,11 @@ Repo.create(url, fileName, dirPath, threads, wifiOnly, probe):
 
 ---
 
-# 第 19 部分 · 广告过滤（AdBlocker）
+# 第 18 部分 · 广告过滤（AdBlocker）
 
 内置浏览器在 `shouldInterceptRequest` 里按域名拦掉广告/统计请求。规则随安装包分发，运行时不联网。
 
-## 19.1 规则来源与匹配
+## 18.1 规则来源与匹配
 
 ```
 素材: assets/adblock_hosts.txt
@@ -1459,7 +1459,7 @@ Repo.create(url, fileName, dirPath, threads, wifiOnly, probe):
 规则可读、可审计，且不会出现"某条正则意外吃掉整站"的情况。代价是路径级规则
 （`/ads/banner.js`）无法表达——这类规则占比小，放弃。
 
-## 19.2 拦截判定与响应
+## 18.2 拦截判定与响应
 
 ```
 shouldBlock(url, pageHost):
@@ -1488,7 +1488,7 @@ shouldInterceptRequest(request):
 
 **主文档永不拦截**（`isForMainFrame` 直接放行）：这是"名单里有站点主域"时不至于整页白屏的兜底。
 
-## 19.3 站点白名单
+## 18.3 站点白名单
 
 ```
 存储: prefs["adblock_allow"] = Set<String>（小写 host）
@@ -1500,14 +1500,14 @@ shouldInterceptRequest(request):
 
 白名单只影响被访问页面所属的站点（`pageHost`），不影响其他站点。
 
-## 19.4 计数与界面
+## 18.4 计数与界面
 
 - `blocked` 是进程内 `AtomicLong`，重启归零；`shouldInterceptRequest` 每拦一次 +1。
 - 界面每 500 ms 拉一次（与嗅探队列同一循环），只用于显示，不参与判定。
 - 入口两处：设置 →「广告过滤」开关；浏览页菜单 →「广告过滤（已拦 N）」+「本站关闭/恢复过滤」。
   两处改的是同一份 prefs，切换后 `reload()` 让新规则立即生效。
 
-## 19.5 线程与边界
+## 18.5 线程与边界
 
 | 情况 | 行为 |
 |---|---|
@@ -1521,7 +1521,7 @@ shouldInterceptRequest(request):
 
 ---
 
-## 19.6 用户导入规则（本地文件）
+## 18.6 用户导入规则（本地文件）
 
 内置名单规模有限，但**不引入网络订阅**。想用更强名单的用户自行导入本地文件。
 
@@ -1555,7 +1555,7 @@ shouldInterceptRequest(request):
 
 用户看到的反馈只有两种：`导入 N 条` / `没读到有效规则`。
 
-## 19.7 与同类产品的边界对照（为什么不做更多）
+## 18.7 与同类产品的边界对照（为什么不做更多）
 
 同类产品的过滤引擎支持范围（作为"要不要跟"的参照）：
 
@@ -1577,12 +1577,12 @@ shouldInterceptRequest(request):
 
 ---
 
-# 第 20 部分 · 诊断日志（Diag）
+# 第 19 部分 · 诊断日志（Diag）
 
 正式版也开启的本地日志，用来捕捉"嗅探为空 / 页面打不开"这类在开发机上复现不了的问题。
 **不上传、不联网、不含任何标识符。**
 
-## 20.1 位置与轮转
+## 19.1 位置与轮转
 
 ```
 位置: <外部私有目录>/logs/diag.log
@@ -1596,7 +1596,7 @@ shouldInterceptRequest(request):
 开关: prefs["diag_log"]，默认 true；设置页「诊断」分组可关、可清空
 ```
 
-## 20.2 行格式
+## 19.2 行格式
 
 ```
 <MM-dd HH:mm:ss.SSS>  <EVENT>  <detail 截断 240 字符>
@@ -1622,14 +1622,14 @@ shouldInterceptRequest(request):
 | `TASK_WIFI_WAIT` | `id` | 因仅 Wi-Fi 约束自己暂停 |
 | `SEG_RETRY` | `id seg attempt 异常` | 分段重试（VPN 抖动时会连着出现） |
 
-## 20.3 隐私边界（不可放宽）
+## 19.3 隐私边界（不可放宽）
 
 - **只记**：事件名、主机名、计数、错误码、异常类型。
 - **不记**：完整 URL（含 query/token）、Cookie、请求/响应体、`installId`、任何设备标识。
 - 日志留在应用自己的外部目录内，卸载即删；应用从不读取它、更不上传。
 - 关掉开关后不再写新行（已有内容不自动删除，需要用户在设置页点「清空」）。
 
-## 20.4 取日志
+## 19.4 取日志
 
 ```powershell
 adb shell cat /storage/emulated/0/Android/data/<applicationId>/files/logs/diag.log
@@ -1638,7 +1638,7 @@ adb pull /storage/emulated/0/Android/data/<applicationId>/files/logs/diag.log
 
 `<applicationId>`：release 为 `com.huangsy.freedm`，debug 为 `com.huangsy.freedm.dev`。
 
-## 20.5 怎么用它区分故障类型
+## 19.5 怎么用它区分故障类型
 
 | 观察 | 结论 |
 |---|---|
@@ -1648,4 +1648,198 @@ adb pull /storage/emulated/0/Android/data/<applicationId>/files/logs/diag.log
 | `PAGE_DONE … net>0 sniffed=0`，之后仍有 `SNIFF_NET` | 队列没被抽干或合并出错（查主线程是否被阻塞） |
 | `NET_TRANSPORT` 出现 `vpn` 之后开始 `PAGE_ERR` | 问题在 VPN 链路，不在 WebView |
 | `SEG_RETRY` 连续 3 次后 `TASK_FAIL` | 下载侧网络不稳（同样受 VPN 影响） |
+
+---
+
+# 第 20 部分 · 嗅探规则的强度对标与已知缺口
+
+## 20.1 嗅探的三层来源
+
+同一个页面上，"能被发现的可下载资源"来自三个深度不同的层：
+
+| 层 | 能拿到什么 | 本项目 |
+|---|---|---|
+| **DOM 扫描** | `<video>/<audio>/<source>` 的 src、指向媒体后缀的 `<a href>`、元素尺寸 | ✅ 已做（§9.1） |
+| **资源加载拦截** | 每个子请求的 URL；**拿不到响应体**，MIME 只能靠后缀猜 | ✅ 已做（§9.3） |
+| **XHR / fetch 接管** | 请求头、**响应体**、响应头（Content-Type / Length / Range / Disposition）、重定向后的真实 URL | ❌ 不做 |
+
+第三层是同类产品做得最深的地方，做法是向页面注入一段脚本：
+
+```
+包装 XMLHttpRequest.prototype.setRequestHeader  → 记录所有请求头
+包装 XMLHttpRequest.prototype.open             → 判断该请求是否值得嗅探
+    ├─ 是 → 挂 load 监听，读出 responseText / responseURL / 6 个关键响应头
+    └─ 否 → 把 URL 改写成 https://localhost:<随机端口>?url=<base64>   ← 阻断手段
+包装 window.fetch                              → 同上，并包装 response.text()/json()
+```
+
+它靠这一层能拿到 **HLS 播放列表的正文**，进而解析出分片地址——这是纯 URL 嗅探做不到的。
+
+## 20.2 为什么不做第三层
+
+| 理由 | 说明 |
+|---|---|
+| 需要注入**可变** JS | 与"注入脚本随包固定、不从网络下发"的原则直接冲突 |
+| 能读到页面**所有**响应体 | 包括登录态、私信、API 返回的隐私数据；一旦有 bug 就是全量泄露 |
+| 阻断手段会**破坏页面** | 把不嗅探的请求改写到随机端口，等于主动让页面功能失效 |
+| 收益主要是 HLS 分片 | 而本项目本来就"只作单文件下载、不做分片合并"（§2.3） |
+
+换句话说：第三层的收益（抓 m3u8 分片）我们**主动放弃**了，代价是放弃换取"注入面固定 + 不读响应体"。
+
+## 20.3 我们的嗅探判定链
+
+```
+候选来源
+  ├─ DOM：onPageFinished 后执行固定脚本，返回 JSON（最多 50 条）
+  └─ 网络：shouldInterceptRequest 里按 URL 判定
+
+排除
+  ├─ 非 http(s) scheme
+  └─ 只有被判定为 VIDEO / AUDIO / HLS / DASH 的才收；其余一律落 FILE 且不入库
+     （css / js / 图片这些天然落到 FILE，等于隐式排除，不需要额外维护后缀黑名单）
+
+类型判定（只看 URL 后缀与已知 MIME）
+  .m3u8 / application/(x-mpegurl|vnd.apple.mpegurl)  → HLS
+  .mpd  / application/dash+xml                        → DASH
+  其它视频后缀 / video/*                              → VIDEO
+  音频后缀 / audio/*                                  → AUDIO
+  其余                                                → FILE
+
+去重
+  规范化 URL：去 #fragment，query 按 key 排序
+  同一 URL 被 DOM 与网络同时命中 → 合并，保留先到者的来源标记
+```
+
+**规则是编译期固定的**：没有"配置下发"，没有"按站点调参"。
+同类产品的嗅探行为是可远程调节的（站点级 + 全局级配置合并，含扩展名白名单、
+大小上下限、类型开关等十几个字段）——那意味着**嗅探什么由服务端决定**，
+本项目不采用。
+
+## 20.4 已知缺口（按严重程度）
+
+### 缺口 1 · 数据库升级会静默清空记录 ⚠️
+
+```
+现状: onUpgrade() = DROP TABLE segment; DROP TABLE download; 重建
+前提: 注释写的是"未发布版本不写迁移"
+问题: 项目已发布 —— 这个前提已经不成立
+触发: VERSION 从 1 改成 2 的那一刻
+后果: 用户的下载记录全部消失，不崩溃、不报错、无提示
+```
+
+**必须处理**。三选一：写真正的迁移（`ALTER TABLE ADD COLUMN` + 版本分支）／
+升级时显式提示"本次更新清空记录"／长期保持 VERSION=1 不动 schema。
+
+**已处理（选第三项 + 防呆）**：`onUpgrade` 改为**空实现 + 注释模板**，永不 `DROP`；
+`onDowngrade` 同样不再抛异常。将来真要加列，必须在该方法里写 `if (oldVersion < 2) { ALTER TABLE … }`
+并在 `onCreate` 里镜像同一列。
+
+### 缺口 2 · 预分配遇到空间不足
+
+```
+现状: raf.setLength(totalBytes) 在首字节前就占满磁盘
+触发: 剩余空间 < 文件大小
+表现: IOException(ENOSPC) → 任务 FAILED，错误信息是系统原文
+体验问题: 下 10 GB 文件时"一点开始就失败"，而不是下到一半才失败
+```
+
+建议至少在启动前做一次可用空间预检，给出"空间不足（需 X，剩 Y）"这种可读提示。
+
+**已处理**：`runTask` 在 `setLength` 之前比较 `totalBytes - 已落盘` 与 `dir.usableSpace`，
+不足则 `FAILED`，错误信息为 `空间不足（需 1.2 GB，剩 300 MB）`。
+
+### 缺口 3 · 文件被外部删除后续传
+
+```
+触发: 用户清理数据 / 手动删文件 / 迁移存储后
+已完成任务: 记录在、文件没了 → 列表显示 totalBytes（已兜底），点开提示错误
+未完成任务: raf 重新打开会创建空文件 → setLength 预分配 → 从 0 开始写
+            但 DB 里 segment.downloaded 仍是旧值 → 锚点错位 → 文件可能损坏
+```
+
+**这是逻辑漏洞**。补救：`runTask` 打开文件后，若 `raf.length() < Σ segment.downloaded`
+则说明文件被截断或删除 → 重置分片计划并从头下载（而不是沿用旧锚点）。
+
+**已处理**：检测到 `claimed > onDisk` 时记 `TASK_FILE_LOST`、重建分片、清空锚点，从段首重下。
+实测：下到 917504 B 时删文件重启 → 日志 `TASK_FILE_LOST onDisk=0 claimed=917504`，
+服务器收到的 Range 起点回到段首（`bytes=0-…` / `bytes=10485760-…`），不再出现中途偏移。
+
+### 缺口 4 · 断网表现为"失败"而非"等待"
+
+```
+现状: fetchSegment 重试 3 次（1s/2s/4s）全失败 → 整任务 FAILED
+对比: 仅 Wi-Fi 约束触发的是 PAUSED + 等待标记，网络恢复会自动继续
+不一致: 同样是"没网"，一个变红等用户手动重试，一个自己恢复
+```
+
+建议：识别网络不可用类异常（`UnknownHostException` / `ConnectException` /
+`SocketException` 且 `NetworkCapabilities` 不可用）→ **不消耗重试次数**，
+直接 `PAUSED` 并打上等待标记，交给 §7 的网络监听拉起。
+
+**已处理**：新增标记 `NET_WAIT = "等待网络"`。`fetchSegment` 在 `!hasInternet()` 且异常属
+连接类（`UnknownHost`/`Connect`/`Socket`/`SocketTimeout`）时抛内部 `NetworkWait`，
+`runTask` 捕获后置 `PAUSED + NET_WAIT`；`NetworkWatcher` 的 `onAvailable` 同时恢复
+`WIFI_WAIT` 与 `NET_WAIT` 两种等待。
+
+顺带修掉一个相邻 bug：`SocketTimeoutException` 是 `InterruptedIOException` 的子类，
+原来会被当成"用户暂停"直接抛 `CancellationException` —— 于是 VPN/弱网下读超时表现为
+任务**静默停在 PAUSED**。现在排除该子类，超时按普通失败进入重试。
+
+实测：5.7 MB 任务下到 3.99 MB 时关 Wi-Fi+数据 → `TASK_NET_WAIT`、DB `PAUSED / 等待网络`；
+恢复网络 → `NET_AVAILABLE waiting=1` → 自动续传 → `TASK_DONE`，大小与远端一致。
+
+### 缺口 5 · 并发创建同名文件
+
+```
+现状: FileNamer.uniqueIn 只查磁盘上是否存在
+触发: 两个任务在同一时刻被创建，probing 得到相同文件名
+后果: 后一个任务的 dirPath/fileName 与前一个相同 → 互相覆盖
+```
+
+建议：`uniqueIn` 同时查 DB 里是否存在同 `dir_path + file_name` 的非终态任务。
+
+**已处理**：`Repo.create` 里做最终仲裁（`uniqueName` → `nameInUse` 查
+`state IN (QUEUED, RUNNING, PAUSED)`），所有创建入口自动统一。磁盘冲突仍由调用方的
+`FileNamer.uniqueIn` 处理。
+
+### 缺口 6 · 302 重定向被当成失败 ⚠️
+
+```
+触发: 镜像站/网盘常见做法是 302 到另一个 host 或另一个协议（如 https → http）
+现象: 日志 SEG_RETRY "IOException: HTTP 302"，三次后 TASK_FAIL
+原因: HttpURLConnection.setInstanceFollowRedirects(true) 对跨 host / 跨协议的 302
+      会静默放弃；探测拿到的是 302 响应的 Content-Length（实测 215 B），
+      于是任务以错误大小开始，下载请求又直接撞 302
+```
+
+**已处理**：`Prober.openFollowing()` 手工跟随（最多 5 跳，`Location` 相对/绝对都支持），
+探测与 `fetchSegment` 共用；每次跳转都重新应用 `Range` / `If-Range` 头。
+
+实测：`mirrors.aliyun.com/.../ubuntu-24.04.1-live-server-amd64.iso` 原先直接 302 失败，
+现在能跟到 `iso-osm.mirrors.aliyuncs.com`。
+
+> **待决策**：阿里云这个目标跳到了 **http 明文**，因此被 `usesCleartextTraffic=false` 拒绝
+> （日志 `Cleartext HTTP traffic … not permitted`）。是否允许下载引擎走明文 http 属于产品策略，
+> 未擅自放开 —— 放开会影响 WebView 与全局网络安全配置。
+
+### 缺口 7 · `SocketTimeoutException` 被当成"用户暂停"
+
+```
+原因: java.net.SocketTimeoutException extends InterruptedIOException，
+      而暂停判定写的是 e is InterruptedIOException
+后果: 弱网 / VPN 抖动时读超时 → 抛 CancellationException → 任务停在 PAUSED，
+      没有任何提示，看起来就是"下载不动了"
+```
+
+**已处理**：暂停判定改为 `Thread.interrupted || (e is InterruptedIOException && e !is SocketTimeoutException)`。
+
+## 20.5 另一个一句话带过的点
+
+**前台服务被系统杀死后不会自己恢复调度**：`START_STICKY` 重启时 `onStartCommand`
+拿到 null intent，当前只刷新通知，**没有调用 `pump()`**。任务会停在 `RUNNING`
+直到用户重新打开 app。修法是在 `onStartCommand` 的默认分支里补一次 `pump()`。
+
+**已处理**：默认分支补 `Engine.pump()`；同时新增 `FreedmApp : Application`，
+在 `Application.onCreate` 里 `Repo.init` + `Diag.init` —— 否则"只有服务被重启"的进程里
+`Repo` 根本没初始化，`pump()` 也无从谈起。`MainActivity` 不再重复初始化。
 

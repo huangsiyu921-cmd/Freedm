@@ -123,6 +123,58 @@ adb shell dumpsys notification --noredact | findstr "pkg=app.freedm"
 且第 4 个在前 3 个之一结束后**自动补位**（`Engine.pump()` 在该任务的 `finally` 里）。
 代码路径：`Engine.pump()`。
 
+### A13 文件被外部删除后续传 — `PASS`
+
+```powershell
+# 慢速源下到 ~10% 后
+adb shell am force-stop com.huangsy.freedm.dev
+adb shell rm -f /storage/emulated/0/Download/FreeDM/Other/slow.bin
+adb shell am start -n com.huangsy.freedm.dev/app.freedm.MainActivity
+adb shell cat /storage/emulated/0/Android/data/com.huangsy.freedm.dev/files/logs/diag.log
+```
+
+判定：日志出现 `TASK_FILE_LOST id=… onDisk=0 claimed=<已下载>`，且服务器侧新的 Range
+**从段首开始**（如 `bytes=0-10485759`），不是从中途偏移。
+实测：`onDisk=0 claimed=917504`，Range 回到段首。
+
+### A14 断网 → 等待 → 自动恢复 — `PASS`
+
+```powershell
+# 任务下载中（建议 ≤ 100 KB/s 限速，留出操作时间）
+adb shell svc wifi disable; adb shell svc data disable
+# 等 30–40 s
+adb shell svc wifi enable; adb shell svc data enable
+```
+
+判定：
+1. 断网后任务转 `PAUSED`，`download.error = 等待网络`，日志 `TASK_NET_WAIT`。
+2. 恢复网络后日志 `NET_AVAILABLE waiting=1` → 自动续传 → `TASK_DONE`，大小与远端一致。
+实测：5.7 MB 任务断网于 3.99 MB，恢复后完成；DB 终态 `COMPLETED / 5761919 / 5761919`。
+
+### A15 302 跨 host 重定向 — `PASS`
+
+判定：`mirrors.aliyun.com/.../ubuntu-24.04.1-live-server-amd64.iso` 不再出现
+`SEG_RETRY … HTTP 302`；探测能拿到真实大小（不再是 302 响应的 215 B）。
+实测：跟到 `iso-osm.mirrors.aliyuncs.com` 后被明文策略拒绝（`Cleartext HTTP traffic … not permitted`）
+—— 说明跟随成功，剩余是产品策略问题（见 `logic-spec.md` §20.4 缺口 6）。
+
+### A16 数据库升级不清空记录 — `PASS`（代码审阅）
+
+判定：`Db.onUpgrade` 不再包含 `DROP TABLE`；`onDowngrade` 不抛异常。
+当前 `VERSION = 1` 且无 v2，无法实测迁移，故以代码审阅为准。
+
+### A17 空间不足预检 — `TODO`
+
+判定：把设备剩余空间压到小于目标文件，任务应在首字节前失败，`error` 形如
+`空间不足（需 1.2 GB，剩 300 MB）`，而不是下到一半才 `ENOSPC`。
+代码路径：`Engine.runTask` 的 `dir.usableSpace` 预检。
+
+### A18 同名任务并发去重 — `TODO`
+
+判定：同一 URL 连续创建两次（同一 `dir_path`），第二个任务的 `file_name` 应为
+`<name> (1).<ext>`，两条记录的 `dir_path + file_name` 不重复。
+代码路径：`Repo.create` → `uniqueName` / `nameInUse`。
+
 ---
 
 ## B. 浏览器与集成
@@ -161,7 +213,7 @@ adb shell run-as com.huangsy.freedm.dev cat shared_prefs/settings.xml   # 看 ad
 3. 再点「本站恢复过滤」→ 白名单清空（`<set name="adblock_allow" />`）。
 4. 页面本身永远正常显示（主文档不拦）。
 
-规则与匹配逻辑见 `docs/logic-spec.md` §19；名单文件 `app/src/main/assets/adblock_hosts.txt`。
+规则与匹配逻辑见 `docs/logic-spec.md` §18；名单文件 `app/src/main/assets/adblock_hosts.txt`。
 
 ### B5 诊断日志 — `PASS`
 
@@ -178,7 +230,7 @@ adb shell cat /storage/emulated/0/Android/data/com.huangsy.freedm.dev/files/logs
 4. 百度首页不应再出现 `PAGE_START utils` / `ERR_UNKNOWN_URL_SCHEME`（deeplink 已被拦）；出现 `NAV_BLOCKED` 属正常。
 5. 设置页「诊断」显示路径与大小，点「清空诊断日志」后文件消失。
 
-事件表与取日志方法见 `docs/logic-spec.md` §20。
+事件表与取日志方法见 `docs/logic-spec.md` §19。
 
 ---
 

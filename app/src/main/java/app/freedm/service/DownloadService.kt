@@ -51,7 +51,13 @@ class DownloadService : Service() {
                 Engine.pauseAll()
                 stopSelfIfIdle()
             }
-            else -> updateNotification()
+            else -> {
+                // A START_STICKY restart arrives with a null intent (or none of our
+                // actions): nothing else in this process drives the queue, so the
+                // tasks would sit in QUEUED until the user opened the app again.
+                updateNotification()
+                Engine.pump()
+            }
         }
         return START_STICKY
     }
