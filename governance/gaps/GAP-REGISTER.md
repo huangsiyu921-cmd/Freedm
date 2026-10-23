@@ -56,7 +56,7 @@
 |---|---|---|---|---|---|---|---|
 | GAP-012 | Medium | HLS/DASH 只作单文件下载，无分片合并 | `REQ-BR-005`、`ACC-BR-002` | **DEFERRED** | 复核日记录：2027-01-31 | 到期复核 | OWNER |
 | GAP-013 | Low | 广告过滤不处理内联广告位 | `README` 已知限制 | **DEFERRED** | 复核日记录：2027-01-31 | 到期复核 | OWNER |
-| GAP-014 | Medium | 列表长按多选、添加下载改保存位置未实现 | `ui-design.md` | **DEFERRED** | 复核日记录：2027-01-31 | 到期复核 | OWNER |
+| GAP-014 | Medium | 添加下载时更改保存位置未实现 | 多选已于 2026-10-23 实现并通过 `assembleDebug`；保存位置仍固定为私有目录 | **DEFERRED** | 多选：代码完成，待真机；保存位置：未做 | 到期复核；多选待真机确认后另记 | OWNER |
 | GAP-019 | Medium | release 签名与 `proguard` 规则未实测 | `README` 已知限制 | **DEFERRED** | 复核日记录：发布前 | 发布前复核 | OWNER |
 | GAP-025 | Low | `logic-spec §14.4` 自述存在重复格式化实现 | 文档原文 | **OPEN** | 未取得 | 合并实现并登记 `DEC-*` | CLEAN |
 | GAP-030 | Medium | 无 torrent、无密码管理、无主题市场未逐条登记 | `acceptance.md §D` | **DEFERRED** | 复核日记录：2027-01-31 | OWNER 确认范围并保持范围声明 | OWNER |

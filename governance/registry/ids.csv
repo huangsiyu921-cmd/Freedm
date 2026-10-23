@@ -31,6 +31,7 @@ ACC-PRV-005,ACC,PRV,除用户输入的下载 URL 与浏览器导航外无网络�
 ACC-PRV-006,ACC,PRV,飞行模式下打开 app，列表/设置/历史应正常,docs/acceptance.md:264,PROPOSED,CLEAN,2026-10-23
 ACC-PRV-007,ACC,PRV,`aapt2 dump permissions app-debug.apk` → 6 项,docs/acceptance.md:265,PROPOSED,CLEAN,2026-10-23
 ACC-PRV-008,ACC,PRV,设置 →「隐私说明」逐条列出不收集项,docs/acceptance.md:266,PROPOSED,CLEAN,2026-10-23
+ACC-UI-001,ACC,UI,下载列表长按多选,docs/acceptance.md,TODO,CLEAN,2026-10-23
 CAND-DL-001,CAND,DL,候选行为规格包,governance/handoff/README.md,PROPOSED,DIRTY,2026-10-23
 CONST-BR-001,CONST,BR,单次页面扫描上限,docs/spec/constants.md:28,PROPOSED,CLEAN,2026-10-23
 CONST-BR-002,CONST,BR,媒体体积过滤,docs/spec/constants.md:29,PROPOSED,CLEAN,2026-10-23
@@ -242,4 +243,5 @@ REQ-UI-008,REQ,UI,已完成任务点击行必须能打开文件；菜单必须�
 REQ-UI-009,REQ,UI,空态、加载态、错误态必须有明确文案，不得只显示空白。,docs/spec/requirements.md:143,PROPOSED,CLEAN,2026-10-23
 REQ-UI-010,REQ,UI,主题必须支持浅色/深色与动态取色；未实现的能力不得以死开关展示。,docs/spec/requirements.md:144,PROPOSED,CLEAN,2026-10-23
 REQ-UI-011,REQ,UI,设置页必须提供下载参数、外观、隐私说明与诊断日志开关。,docs/spec/requirements.md:145,PROPOSED,CLEAN,2026-10-23
+REQ-UI-012,REQ,UI,下载列表长按多选、全选、暂停、删除（删除需确认）,docs/spec/requirements.md,IMPLEMENTED,CLEAN,2026-10-23
 REV-001,REV,GOV,独立验证记录（待签发）,governance/reviews/TEMPLATE-VERIFICATION.md,OPEN,AUDIT,2026-10-23

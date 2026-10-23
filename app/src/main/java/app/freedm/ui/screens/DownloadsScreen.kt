@@ -3,8 +3,10 @@ package app.freedm.ui.screens
 import android.content.Context
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,7 +32,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -113,12 +117,20 @@ fun DownloadsScreen(
     var filter by remember { mutableStateOf(Filter.ALL) }
     var showAdd by remember { mutableStateOf(false) }
     var prefill by remember { mutableStateOf<String?>(null) }
+    var selection by remember { mutableStateOf<Set<Long>>(emptySet()) }
+    var confirmDelete by remember { mutableStateOf(false) }
     val ctx = Repo.context
 
     // Paused and finished tasks have no live counters, so load their persisted
     // segment rows once per task set and drive the bar from those.
     LaunchedEffect(tasks.map { it.id }) {
         withContext(Dispatchers.IO) { tasks.forEach { Repo.publishSegments(it.id) } }
+    }
+
+    // Deleting a task (or a filter change) must not leave stale ids selected.
+    LaunchedEffect(tasks.map { it.id }) {
+        val ids = tasks.map { it.id }.toSet()
+        selection = selection.intersect(ids)
     }
 
     // A link shared into the app, or caught by the clipboard watcher, opens the
@@ -133,14 +145,38 @@ fun DownloadsScreen(
     }
 
     val visible = tasks.filter { filter.matches(it) }
+    val selectedTasks = visible.filter { it.id in selection }
+    val selecting = selection.isNotEmpty()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("下载") },
+                title = { Text(if (selecting) "已选 ${selection.size}" else "下载") },
+                navigationIcon = {
+                    if (selecting) {
+                        IconButton(onClick = { selection = emptySet() }) {
+                            Icon(Icons.Default.Close, contentDescription = "退出多选")
+                        }
+                    }
+                },
                 actions = {
-                    TextButton(onClick = { Engine.resumeAll() }) { Text("全部开始") }
-                    TextButton(onClick = { Engine.pauseAll() }) { Text("全部暂停") }
+                    if (selecting) {
+                        TextButton(onClick = { selection = visible.map { it.id }.toSet() }) {
+                            Text("全选")
+                        }
+                        TextButton(
+                            onClick = {
+                                selectedTasks
+                                    .filter { it.state == TaskState.RUNNING }
+                                    .forEach { Engine.pause(it.id) }
+                                selection = emptySet()
+                            },
+                        ) { Text("暂停") }
+                        TextButton(onClick = { confirmDelete = true }) { Text("删除") }
+                    } else {
+                        TextButton(onClick = { Engine.resumeAll() }) { Text("全部开始") }
+                        TextButton(onClick = { Engine.pauseAll() }) { Text("全部暂停") }
+                    }
                 },
             )
         },
@@ -187,7 +223,16 @@ fun DownloadsScreen(
                             bps = live?.bytesPerSec ?: 0L,
                             segmentPercents = live?.segmentPercents?.takeIf { it.isNotEmpty() }
                                 ?: persistedPercents(t, segmentMap[t.id]),
-                            onClick = { onOpenDetail(t.id) },
+                            selected = t.id in selection,
+                            selecting = selecting,
+                            onClick = {
+                                if (selecting) {
+                                    selection = toggleSelection(selection, t.id)
+                                } else {
+                                    onOpenDetail(t.id)
+                                }
+                            },
+                            onLongClick = { selection = selection + t.id },
                             onToggle = { toggle(t) },
                             onOpen = if (t.state == TaskState.COMPLETED) {
                                 { openFile(ctx, t) }
@@ -216,7 +261,33 @@ fun DownloadsScreen(
             scope = scope,
         )
     }
+
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("删除任务") },
+            text = { Text("删除已选 ${selection.size} 个任务及其文件？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedTasks.forEach { t ->
+                            Engine.forget(t.id)
+                            Repo.delete(t.id, deleteFiles = true)
+                        }
+                        confirmDelete = false
+                        selection = emptySet()
+                    },
+                ) { Text("删除") }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }) { Text("取消") }
+            },
+        )
+    }
 }
+
+private fun toggleSelection(selection: Set<Long>, id: Long): Set<Long> =
+    if (id in selection) selection - id else selection + id
 
 private fun toggle(t: DownloadTask) {
     if (t.state == TaskState.RUNNING) {
@@ -321,6 +392,7 @@ private fun EmptyState(filter: Filter) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun TaskCard(
     task: DownloadTask,
@@ -328,7 +400,10 @@ private fun TaskCard(
     total: Long,
     bps: Long,
     segmentPercents: List<Float>,
+    selected: Boolean,
+    selecting: Boolean,
     onClick: () -> Unit,
+    onLongClick: () -> Unit,
     onToggle: () -> Unit,
     onOpen: (() -> Unit)?,
     onRedownload: () -> Unit,
@@ -373,20 +448,39 @@ private fun TaskCard(
                 .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Icon(
-                painter = painterResource(kindIcon(task.fileName)),
-                contentDescription = null,
-                tint = onTop.copy(alpha = 0.9f),
-                modifier = Modifier
-                    .size(32.dp)
-                    .padding(6.dp),
-            )
+            if (selecting) {
+                Checkbox(
+                    checked = selected,
+                    onCheckedChange = { onClick() },
+                    modifier = Modifier.size(32.dp),
+                )
+            } else {
+                Icon(
+                    painter = painterResource(kindIcon(task.fileName)),
+                    contentDescription = null,
+                    tint = onTop.copy(alpha = 0.9f),
+                    modifier = Modifier
+                        .size(32.dp)
+                        .padding(6.dp),
+                )
+            }
             Column(
                 Modifier
                     .weight(1f)
                     // Tap lives on the text block only: a row-wide clickable
                     // would sit on top of the action button and swallow its tap.
-                    .clickable(onClick = if (done && onOpen != null) onOpen else onClick)
+                    .combinedClickable(
+                        onClick = {
+                            if (selecting) {
+                                onClick()
+                            } else if (done && onOpen != null) {
+                                onOpen()
+                            } else {
+                                onClick()
+                            }
+                        },
+                        onLongClick = onLongClick,
+                    )
                     .padding(start = 8.dp),
             ) {
                 Text(
@@ -446,34 +540,36 @@ private fun TaskCard(
                     }
                 }
             }
-            if (!done) {
-                IconButton(onClick = onToggle, modifier = Modifier.size(40.dp)) {
-                    Icon(
-                        imageVector = if (task.state == TaskState.RUNNING) Icons.Default.Close
-                        else Icons.Default.PlayArrow,
-                        contentDescription = if (task.state == TaskState.RUNNING) "暂停" else "继续",
-                        tint = onTop,
-                    )
-                }
-            } else {
-                var menu by remember { mutableStateOf(false) }
-                Box {
-                    IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "更多", tint = onTop)
+            if (!selecting) {
+                if (!done) {
+                    IconButton(onClick = onToggle, modifier = Modifier.size(40.dp)) {
+                        Icon(
+                            imageVector = if (task.state == TaskState.RUNNING) Icons.Default.Close
+                            else Icons.Default.PlayArrow,
+                            contentDescription = if (task.state == TaskState.RUNNING) "暂停" else "继续",
+                            tint = onTop,
+                        )
                     }
-                    DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                        DropdownMenuItem(
-                            text = { Text("详细信息") },
-                            onClick = { menu = false; onClick() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("重新下载") },
-                            onClick = { menu = false; onRedownload() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("删除") },
-                            onClick = { menu = false; onDelete() },
-                        )
+                } else {
+                    var menu by remember { mutableStateOf(false) }
+                    Box {
+                        IconButton(onClick = { menu = true }, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "更多", tint = onTop)
+                        }
+                        DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                            DropdownMenuItem(
+                                text = { Text("详细信息") },
+                                onClick = { menu = false; onClick() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("重新下载") },
+                                onClick = { menu = false; onRedownload() },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("删除") },
+                                onClick = { menu = false; onDelete() },
+                            )
+                        }
                     }
                 }
             }
