@@ -6,6 +6,7 @@
 > `SCOPE: D:\1DM+（Clean） + <DIRTY_WORKSPACE>（Dirty）`
 > `LEGAL-STATUS: NOT_REVIEWED`
 > `结论: 资产来源可分级，但发布门禁仍为 BLOCKED；本文件不构成法律意见。`
+> 2026-10-23 单人模式：`GAP-006/007/020` 已转 `DEFERRED`；本文件的分析结论不变，不构成法律判定。
 
 ---
 

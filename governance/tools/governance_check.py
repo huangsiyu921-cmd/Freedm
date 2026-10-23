@@ -235,8 +235,10 @@ def check_gaps() -> None:
         if sev not in SEVERITIES:
             fail(f"invalid severity {sev!r} for {ident}")
         counts[status] = counts.get(status, 0) + 1
-        if status == "BLOCKED" and sev in {"Critical", "High"}:
-            gate_blockers.append(f"{ident} ({sev}) BLOCKED")
+        # Single-developer mode: a disclosed Critical/High risk is not closed.
+        # Keep DEFERRED high-risk items as release blockers so the gate cannot turn green.
+        if status in {"BLOCKED", "DEFERRED"} and sev in {"Critical", "High"}:
+            gate_blockers.append(f"{ident} ({sev}) {status}")
     print("GAP status counts:", ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
 
 

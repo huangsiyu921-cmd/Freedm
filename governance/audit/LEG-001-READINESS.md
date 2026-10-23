@@ -1,7 +1,7 @@
 # LEG-001 签发前资格检查（READINESS）
 
 > `AUDIT-ID: LEG-001-READINESS-2026-10-23`
-> `STATUS: NOT_READY / BLOCKED`
+> `STATUS: STRUCTURALLY_UNAVAILABLE / SINGLE_DEVELOPER`
 > `ROLE: ROLE-AUDIT（审查组织与独立性检查；不是 COUNSEL，不签发法律意见）`
 > `注意: 本文件不是法律审查记录。正式记录只能是 governance/reviews/LEG-001-*.md，由 COUNSEL 签署。`
 
@@ -9,7 +9,7 @@
 
 ## 1. 结论
 
-**LEG-001 现在不得签发。** 候选包已在 Dirty 侧带 manifest（`EV-G2-001`），但仍缺审查员任命、独立性声明，以及 G0/G1 与 OBS 的 AUDIT 复核。
+**LEG-001 永不签发。** 单人项目无法满足审查独立性；本文件只记录结构性原因，不是待办、不是法律意见。
 在 G3 准入条件满足前，任何“法律审查已通过”的表述都不成立。
 
 ## 2. 准入条件逐项检查（gates.md G3）

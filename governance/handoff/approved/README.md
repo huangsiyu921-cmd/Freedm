@@ -7,4 +7,4 @@
 - `CLEAN` 只读；在 `LEG-001` 签发前，不得据本目录新增实现。
 - 不得放入 APK/DEX/反编译源码/截图/原始资源。
 
-状态：`EMPTY / BLOCKED`
+状态：`EMPTY / PERMANENTLY BLOCKED`（单人模式；`LEG-*` 不签发）

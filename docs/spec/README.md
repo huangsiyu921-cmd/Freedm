@@ -2,7 +2,7 @@
 
 > `DOCUMENT-CLASS: NORMATIVE INDEX`
 > `BASELINE: SPEC-BASELINE-2026-10-23`
-> `LEGAL-STATUS: NOT_REVIEWED / BLOCKED`
+> `LEGAL-STATUS: NOT_REVIEWED / PERMANENTLY_BLOCKED (single developer)`
 
 本目录是 FreeDM 的**唯一规范来源**（在 `governance/handoff/approved/` 为空期间的整改基线）。
 描述性设计文档不得单独产生约束。

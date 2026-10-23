@@ -7,6 +7,8 @@
 > 本项目未经法律审查，未经第三方审计，不声称符合任何特定的法律合规开发标准。
 > 本项目未复制目标软件的源代码或受版权保护的表达，但不能保证法律上无风险。
 >
+> 本项目为单人开发，未经法律审查，未经第三方审计；治理包中的 `LEG` / `REV` 角色未任命，相关记录不签发。
+>
 > **合规状态（2026-10-23）**：法律审查 `NOT_REVIEWED`，独立验证未执行；当前版本
 > **不得对外发布**。治理入口 [`governance/README.md`](governance/README.md)，缺口见
 > [`governance/gaps/GAP-REGISTER.md`](governance/gaps/GAP-REGISTER.md)。

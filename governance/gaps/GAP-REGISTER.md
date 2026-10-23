@@ -6,6 +6,7 @@
 > 每条缺口必须有责任人、证据、关闭证据与解除条件；不得以“已知限制”代替状态。
 > 本次维护（2026-10-23，第二版）：新增 `GAP-026..030`，增加“关闭证据”列；
 > 未把任何 `BLOCKED` 改为 `RESOLVED`。
+> 2026-10-23 单人模式：`GAP-006/007/020` 转 `DEFERRED` 并披露风险；Critical/High 的 `DEFERRED` 仍计入发布 blocker。
 
 ---
 
@@ -16,9 +17,9 @@
 | GAP-001 | Critical | 全部规格未经法律审查 | 仓库无 `LEG-*`；`handoff/approved/` 为空 | **BLOCKED** | 未取得 | 任命 COUNSEL，签发 `LEG-001`，批准包入 `approved/` | OWNER |
 | GAP-002 | Critical | 现有实现早于批准规格 | 提交 324c65b；`docs/logic-spec.md` 自述“当前有重复实现” | **BLOCKED** | 未取得 | 法律审查 + 模块→条款追溯；无法证明独立性的模块重做 | COUNSEL/AUDIT |
 | GAP-003 | High | D1 原始分析含受保护表达 | `adblock-engine.md` 原始枚举、`ui-progressview.md` 几何、`file-types` 原始方法名 | **TRIAGED** | 部分：4 份 D1 已加限读横幅（EV-G1-009） | 逐条清洗或由 COUNSEL 判定不可用 | DIRTY |
-| GAP-006 | Critical | 分段进度条几何与候选规格逐条对应 | `docs/logic-spec.md §15` 与 `SegmentProgressBar.kt`；`ASSET-PROVENANCE §3.2` | **BLOCKED** | 未取得 | 法律判定；必要时独立重设计并记录 `DEC-*` + 视觉回归 | COUNSEL/CLEAN |
-| GAP-007 | High | 文件类型表来源标注“原始数据，可直接复用” | `file-types-and-folders.md §3`、`FileKind.kt`；`ASSET-PROVENANCE §3.3` | **BLOCKED** | 未取得 | 区分事实性数据与选择/编排；必要时重建表 | COUNSEL/CLEAN |
-| GAP-020 | Critical | `logic-spec §15–§18` 与逆向笔记存在可追溯关系 | §15/§16/§17/§18 与 Dirty 四份笔记对应 | **BLOCKED** | 未取得 | 与 GAP-006/007 合并法律审查；未通过前不得新增实现 | COUNSEL |
+| GAP-006 | Critical | 分段进度条几何与候选规格逐条对应 | `docs/logic-spec.md §15` 与 `SegmentProgressBar.kt`；`ASSET-PROVENANCE §3.2` | **DEFERRED** | 不适用（单人模式，无 COUNSEL） | 不做法律判定、不签发 LEG；风险已披露；商业发布或取得法律意见前重开 | OWNER |
+| GAP-007 | High | 文件类型表来源标注“原始数据，可直接复用” | `file-types-and-folders.md §3`、`FileKind.kt`；`ASSET-PROVENANCE §3.3` | **DEFERRED** | 不适用（单人模式，无 COUNSEL） | 不做法律判定、不签发 LEG；风险已披露；商业发布或取得法律意见前重开 | OWNER |
+| GAP-020 | Critical | `logic-spec §15–§18` 与逆向笔记存在可追溯关系 | §15/§16/§17/§18 与 Dirty 四份笔记对应 | **DEFERRED** | 不适用（单人模式，无 COUNSEL） | 不做法律判定、不签发 LEG；风险已披露；敏感 UI/几何不推进 | OWNER |
 | GAP-026 | Critical | 需求来源映射与 `OBS-*` 复核未完成 | `REQ-UI-001..011` 原引已删除的 `CAND §8`；`REQ-SH-005` 原引 §7；`REQ-BR-007..012` 原来源不符；候选包已重写并登记 `OBS-001..018`，但 AUDIT 未复核；见 `ASSET-PROVENANCE §4` | **BLOCKED** | 未取得 | AUDIT 复核 OBS 与条款映射；COUNSEL 书面确认；G0/G1 通过后重开 G2 | DIRTY/AUDIT/COUNSEL |
 | GAP-027 | Critical | INC-001/INC-012 影响面未闭环 | `ASSET-PROVENANCE §4`；受影响 REQ 与模块清单；隔离区证据 `EV-G1-009` | **BLOCKED** | 未取得 | COUNSEL 对影响面作书面判定；受影响模块独立重设计或书面风险接受；相关 `REV-*` 通过 | COUNSEL/AUDIT |
 
@@ -85,13 +86,13 @@
 
 | 状态 | 数量 |
 |---|---|
-| BLOCKED | 8 |
+| BLOCKED | 5 |
 | OPEN | 11 |
 | TRIAGED | 4 |
 | RESOLVED | 2 |
-| DEFERRED | 5 |
+| DEFERRED | 8 |
 | **合计** | **30** |
 
-**发布结论：不通过。** 8 个 `BLOCKED` 中 6 个为 Critical；`governance_check.py` 报告
+**发布结论：不通过。** 5 个 `BLOCKED` + 3 个 Critical/High 的 `DEFERRED`（GAP-006/007/020，单人模式风险披露）仍计入 blocker；`governance_check.py` 报告
 **11 个门禁阻塞项**（8 个 Critical/High BLOCKED + 无 `LEG-*` + 无 `REV-*` + `approved/` 为空）。
 在 `GAP-001/002/006/008/020/026/027` 与 `GAP-007` 关闭前不得对外发布。

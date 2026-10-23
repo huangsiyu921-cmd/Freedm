@@ -90,8 +90,8 @@ GAP-002,GAP,GOV,现有实现早于批准规格,governance/gaps/GAP-REGISTER.md:1
 GAP-003,GAP,GOV,D1 原始分析含受保护表达,governance/gaps/GAP-REGISTER.md:16,TRIAGED,AUDIT,2026-10-23
 GAP-004,GAP,GOV,历史文档未全量 ID 化,governance/gaps/GAP-REGISTER.md:25,OPEN,AUDIT,2026-10-23
 GAP-005,GAP,GOV,描述性文档仍含规范措辞,governance/gaps/GAP-REGISTER.md:26,OPEN,AUDIT,2026-10-23
-GAP-006,GAP,GOV,分段进度条几何与候选规格逐条对应,governance/gaps/GAP-REGISTER.md:17,BLOCKED,AUDIT,2026-10-23
-GAP-007,GAP,GOV,文件类型表来源标注“原始数据，可直接复用”,governance/gaps/GAP-REGISTER.md:18,BLOCKED,AUDIT,2026-10-23
+GAP-006,GAP,GOV,分段进度条几何与候选规格逐条对应,governance/gaps/GAP-REGISTER.md:17,DEFERRED,AUDIT,2026-10-23
+GAP-007,GAP,GOV,文件类型表来源标注“原始数据，可直接复用”,governance/gaps/GAP-REGISTER.md:18,DEFERRED,AUDIT,2026-10-23
 GAP-008,GAP,GOV,无独立验证记录,governance/gaps/GAP-REGISTER.md:37,BLOCKED,AUDIT,2026-10-23
 GAP-009,GAP,GOV,无需求→代码追溯矩阵,governance/gaps/GAP-REGISTER.md:27,OPEN,AUDIT,2026-10-23
 GAP-010,GAP,GOV,环境隔离不清,governance/gaps/GAP-REGISTER.md:38,TRIAGED,AUDIT,2026-10-23
@@ -104,7 +104,7 @@ GAP-016,GAP,GOV,`ui-design.md` 早期“广告拦截不做”与实现不一致,
 GAP-017,GAP,GOV,仅 Wi-Fi / 并发上限未实测,governance/gaps/GAP-REGISTER.md:40,OPEN,AUDIT,2026-10-23
 GAP-018,GAP,GOV,空间不足预检 / 同名并发去重仅代码审阅,governance/gaps/GAP-REGISTER.md:41,OPEN,AUDIT,2026-10-23
 GAP-019,GAP,GOV,release 签名与 `proguard` 规则未实测,governance/gaps/GAP-REGISTER.md:52,DEFERRED,AUDIT,2026-10-23
-GAP-020,GAP,GOV,`logic-spec §15–§18` 与逆向笔记存在可追溯关系,governance/gaps/GAP-REGISTER.md:19,BLOCKED,AUDIT,2026-10-23
+GAP-020,GAP,GOV,`logic-spec §15–§18` 与逆向笔记存在可追溯关系,governance/gaps/GAP-REGISTER.md:19,DEFERRED,AUDIT,2026-10-23
 GAP-021,GAP,GOV,验收环境使用 `1DMPlus` AVD 名称,governance/gaps/GAP-REGISTER.md:42,TRIAGED,AUDIT,2026-10-23
 GAP-022,GAP,GOV,`ui-design.md` 交叉引用第 17 部分错误,governance/gaps/GAP-REGISTER.md:30,RESOLVED,AUDIT,2026-10-23
 GAP-023,GAP,GOV,证据清单/哈希缺失,governance/gaps/GAP-REGISTER.md:43,OPEN,AUDIT,2026-10-23

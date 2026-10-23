@@ -1,7 +1,7 @@
 # REV-001 签发前资格检查（READINESS）
 
 > `AUDIT-ID: REV-001-READINESS-2026-10-23`
-> `STATUS: NOT_READY / BLOCKED`
+> `STATUS: STRUCTURALLY_UNAVAILABLE / SINGLE_DEVELOPER`
 > `ROLE: ROLE-AUDIT（组织独立验证与复核；本文件不是验证结论）`
 > `注意: 正式记录只能是 governance/reviews/REV-001-*.md，由 REVIEW 签署、AUDIT 会签。`
 
@@ -9,8 +9,7 @@
 
 ## 1. 结论
 
-**REV-001 现在不得签发。** 没有非作者的评审者任命，没有独立性声明，
-没有盲测包与构建哈希；现有 `docs/acceptance.md` 的 PASS 全部来自实现者自测。
+**REV-001 永不签发。** 单人项目没有非作者评审者；本文件只记录结构性原因，不是待办，也不是验证结论。
 
 ## 2. 准入条件逐项检查（gates.md G5）
 
