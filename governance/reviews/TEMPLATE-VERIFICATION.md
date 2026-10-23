@@ -1,6 +1,6 @@
 # 独立验证记录模板（REV）
 
-> 复制为 `crre/reviews/REV-<序号>-<子系统>.md`。未填完整或独立性不成立的记录无效。
+> 复制为 `governance/reviews/REV-<序号>-<子系统>.md`。未填完整或独立性不成立的记录无效。
 
 ```
 review_id: REV-___

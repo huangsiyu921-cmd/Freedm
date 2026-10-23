@@ -31,7 +31,7 @@ ACC-PRV-005,ACC,PRV,除用户输入的下载 URL 与浏览器导航外无网络�
 ACC-PRV-006,ACC,PRV,飞行模式下打开 app，列表/设置/历史应正常,docs/acceptance.md:264,PROPOSED,CLEAN,2026-10-23
 ACC-PRV-007,ACC,PRV,`aapt2 dump permissions app-debug.apk` → 6 项,docs/acceptance.md:265,PROPOSED,CLEAN,2026-10-23
 ACC-PRV-008,ACC,PRV,设置 →「隐私说明」逐条列出不收集项,docs/acceptance.md:266,PROPOSED,CLEAN,2026-10-23
-CAND-DL-001,CAND,DL,候选行为规格包,crre/handoff/README.md,PROPOSED,DIRTY,2026-10-23
+CAND-DL-001,CAND,DL,候选行为规格包,governance/handoff/README.md,PROPOSED,DIRTY,2026-10-23
 CONST-BR-001,CONST,BR,单次页面扫描上限,docs/spec/constants.md:28,PROPOSED,CLEAN,2026-10-23
 CONST-BR-002,CONST,BR,媒体体积过滤,docs/spec/constants.md:29,PROPOSED,CLEAN,2026-10-23
 CONST-DL-001,CONST,DL,探测连接超时 / 读超时,docs/spec/constants.md:11,PROPOSED,CLEAN,2026-10-23
@@ -51,7 +51,7 @@ CONST-DL-014,CONST,DL,测速窗口,docs/spec/constants.md:24,PROPOSED,CLEAN,2026
 CONST-DL-015,CONST,DL,文件名长度上限,docs/spec/constants.md:25,PROPOSED,CLEAN,2026-10-23
 CONST-DL-016,CONST,DL,重名后缀上限,docs/spec/constants.md:26,PROPOSED,CLEAN,2026-10-23
 CONST-DL-017,CONST,DL,诊断日志轮转上限,docs/spec/constants.md:27,PROPOSED,CLEAN,2026-10-23
-DEC-001,DEC,UI,起始页卡片堆/展开/回收动画为 Clean 独立设计,crre/audit/ASSET-PROVENANCE.md,PROPOSED,CLEAN,2026-10-23
+DEC-001,DEC,UI,起始页卡片堆/展开/回收动画为 Clean 独立设计,governance/audit/ASSET-PROVENANCE.md,PROPOSED,CLEAN,2026-10-23
 DEC-002,DEC,UI,广告过滤简化为仅主机名、随包规则、拒绝复杂语法,CAND-DL-001-notes.md §5.1,PROPOSED,ROLE-DIRTY,2026-10-23
 DEC-003,DEC,UI,下载确认筛选面板可折叠、默认收起,CAND-DL-001-notes.md §5.1,PROPOSED,ROLE-DIRTY,2026-10-23
 DEC-004,DEC,UI,音频容器转换是否保留待定,CAND-DL-001-notes.md §6,PROPOSED,ROLE-DIRTY,2026-10-23
@@ -70,69 +70,69 @@ ERR-DL-010,ERR,DL,网络断开或从 Wi-Fi 切到蜂窝,docs/spec/errors.md:21,P
 ERR-DL-011,ERR,DL,删除正在运行的任务,docs/spec/errors.md:22,PROPOSED,CLEAN,2026-10-23
 ERR-DL-012,ERR,DL,数据库中的状态值无法反序列化,docs/spec/errors.md:23,PROPOSED,CLEAN,2026-10-23
 ERR-SH-001,ERR,SH,分享内容没有可解析的 http(s) URL,docs/spec/errors.md:26,PROPOSED,CLEAN,2026-10-23
-EV-G0-001,EV,CRRE,baseline audit report,crre/registry/evidence.csv:11,RECORDED,ROLE-AUDIT,2026-10-23
-EV-G0-002,EV,CRRE,asset provenance and INC impact assessment,crre/registry/evidence.csv,RECORDED,ROLE-AUDIT,2026-10-23
-EV-G1-001,EV,CRRE,target 1DM+ 18.2,crre/registry/evidence.csv:2,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-002,EV,CRRE,"analysis variant, lab-signed",crre/registry/evidence.csv:3,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-003,EV,CRRE,"analysis variant, unsigned",crre/registry/evidence.csv:4,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-004,EV,CRRE,tree: 5720 files; decompiled sources + endpoint scans,crre/registry/evidence.csv:5,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-005,EV,CRRE,main privacy report,crre/registry/evidence.csv:6,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-006,EV,CRRE,frida dynamic evidence,crre/registry/evidence.csv:7,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-007,EV,CRRE,tree: 5 files; hook scripts + frida-server,crre/registry/evidence.csv:8,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-008,EV,CRRE,tree: 6 files; reproduction scripts,crre/registry/evidence.csv:9,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G1-009,EV,CRRE,tree: 8 files; post-remediation specs snapshot,crre/registry/evidence.csv:10,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G2-001,EV,CRRE,candidate package manifest; 70 clauses; OBS-001..018,crre/registry/evidence.csv,RECORDED,ROLE-DIRTY,2026-10-23
-EV-G4-001,EV,CRRE,"tree: 6 files; normative spec baseline, legal NOT_REVIEWED",crre/registry/evidence.csv:12,RECORDED,ROLE-CLEAN,2026-10-23
-EV-G4-002,EV,CRRE,tree: 50 files; implementation source snapshot,crre/registry/evidence.csv:13,RECORDED,ROLE-CLEAN,2026-10-23
-EV-G4-003,EV,CRRE,tree: 15 files; governance package snapshot,crre/registry/evidence.csv:14,RECORDED,ROLE-AUDIT,2026-10-23
-GAP-001,GAP,CRRE,全部规格未经法律审查,crre/gaps/GAP-REGISTER.md:14,BLOCKED,AUDIT,2026-10-23
-GAP-002,GAP,CRRE,现有实现早于批准规格,crre/gaps/GAP-REGISTER.md:15,BLOCKED,AUDIT,2026-10-23
-GAP-003,GAP,CRRE,D1 原始分析含受保护表达,crre/gaps/GAP-REGISTER.md:16,TRIAGED,AUDIT,2026-10-23
-GAP-004,GAP,CRRE,历史文档未全量 ID 化,crre/gaps/GAP-REGISTER.md:25,OPEN,AUDIT,2026-10-23
-GAP-005,GAP,CRRE,描述性文档仍含规范措辞,crre/gaps/GAP-REGISTER.md:26,OPEN,AUDIT,2026-10-23
-GAP-006,GAP,CRRE,分段进度条几何与候选规格逐条对应,crre/gaps/GAP-REGISTER.md:17,BLOCKED,AUDIT,2026-10-23
-GAP-007,GAP,CRRE,文件类型表来源标注“原始数据，可直接复用”,crre/gaps/GAP-REGISTER.md:18,BLOCKED,AUDIT,2026-10-23
-GAP-008,GAP,CRRE,无独立验证记录,crre/gaps/GAP-REGISTER.md:37,BLOCKED,AUDIT,2026-10-23
-GAP-009,GAP,CRRE,无需求→代码追溯矩阵,crre/gaps/GAP-REGISTER.md:27,OPEN,AUDIT,2026-10-23
-GAP-010,GAP,CRRE,环境隔离不清,crre/gaps/GAP-REGISTER.md:38,TRIAGED,AUDIT,2026-10-23
-GAP-011,GAP,CRRE,候选规格 §7 六态与 §1.1 五态冲突,crre/gaps/GAP-REGISTER.md:28,RESOLVED,AUDIT,2026-10-23
-GAP-012,GAP,CRRE,HLS/DASH 只作单文件下载，无分片合并,crre/gaps/GAP-REGISTER.md:49,DEFERRED,AUDIT,2026-10-23
-GAP-013,GAP,CRRE,广告过滤不处理内联广告位,crre/gaps/GAP-REGISTER.md:50,DEFERRED,AUDIT,2026-10-23
-GAP-014,GAP,CRRE,列表长按多选、添加下载改保存位置未实现,crre/gaps/GAP-REGISTER.md:51,DEFERRED,AUDIT,2026-10-23
-GAP-015,GAP,CRRE,P6 飞行模式可用未实测,crre/gaps/GAP-REGISTER.md:39,OPEN,AUDIT,2026-10-23
-GAP-016,GAP,CRRE,`ui-design.md` 早期“广告拦截不做”与实现不一致,crre/gaps/GAP-REGISTER.md:29,OPEN,AUDIT,2026-10-23
-GAP-017,GAP,CRRE,仅 Wi-Fi / 并发上限未实测,crre/gaps/GAP-REGISTER.md:40,OPEN,AUDIT,2026-10-23
-GAP-018,GAP,CRRE,空间不足预检 / 同名并发去重仅代码审阅,crre/gaps/GAP-REGISTER.md:41,OPEN,AUDIT,2026-10-23
-GAP-019,GAP,CRRE,release 签名与 `proguard` 规则未实测,crre/gaps/GAP-REGISTER.md:52,DEFERRED,AUDIT,2026-10-23
-GAP-020,GAP,CRRE,`logic-spec §15–§18` 与逆向笔记存在可追溯关系,crre/gaps/GAP-REGISTER.md:19,BLOCKED,AUDIT,2026-10-23
-GAP-021,GAP,CRRE,验收环境使用 `1DMPlus` AVD 名称,crre/gaps/GAP-REGISTER.md:42,TRIAGED,AUDIT,2026-10-23
-GAP-022,GAP,CRRE,`ui-design.md` 交叉引用第 17 部分错误,crre/gaps/GAP-REGISTER.md:30,RESOLVED,AUDIT,2026-10-23
-GAP-023,GAP,CRRE,证据清单/哈希缺失,crre/gaps/GAP-REGISTER.md:43,OPEN,AUDIT,2026-10-23
-GAP-024,GAP,CRRE,候选规格章节→REQ 映射未落到条款级,crre/gaps/GAP-REGISTER.md:31,OPEN,AUDIT,2026-10-23
-GAP-025,GAP,CRRE,`logic-spec §14.4` 自述存在重复格式化实现,crre/gaps/GAP-REGISTER.md:53,OPEN,AUDIT,2026-10-23
-GAP-026,GAP,CRRE,需求来源章节失效且无 OBS 追溯,crre/gaps/GAP-REGISTER.md,BLOCKED,AUDIT,2026-10-23
-GAP-027,GAP,CRRE,INC-001/INC-012 影响面未闭环,crre/gaps/GAP-REGISTER.md,BLOCKED,AUDIT,2026-10-23
-GAP-028,GAP,CRRE,B2/B3 验收为 TODO 且无缺口条目,crre/gaps/GAP-REGISTER.md,OPEN,AUDIT,2026-10-23
-GAP-029,GAP,CRRE,302 重定向后的明文 HTTP 策略缺口未登记,crre/gaps/GAP-REGISTER.md,OPEN,AUDIT,2026-10-23
-GAP-030,GAP,CRRE,无 torrent/密码管理/主题市场未逐条登记,crre/gaps/GAP-REGISTER.md,DEFERRED,AUDIT,2026-10-23
-INC-001,INC,CRRE,Dirty 规格引用 Clean 文档并含实现状态,crre/audit/findings.csv:2,RESOLVED,DIRTY,2026-10-23
-INC-002,INC,CRRE,原始表达进入候选规格,crre/audit/findings.csv:3,OPEN,DIRTY,2026-10-23
-INC-003,INC,CRRE,实现端 UI 设计文档误存 Dirty 区,crre/audit/findings.csv:4,RESOLVED,DIRTY,2026-10-23
-INC-004,INC,CRRE,Clean 设计文档与逆向笔记逐条对应,crre/audit/findings.csv:5,BLOCKED,CLEAN/COUNSEL,2026-10-23
-INC-005,INC,CRRE,法律审查从未执行,crre/audit/findings.csv:6,BLOCKED,OWNER,2026-10-23
-INC-006,INC,CRRE,稳定 ID 缺失,crre/audit/findings.csv:7,RESOLVED,CLEAN,2026-10-23
-INC-007,INC,CRRE,规定性与描述性混装,crre/audit/findings.csv:8,OPEN,CLEAN,2026-10-23
-INC-008,INC,CRRE,验证独立性缺失,crre/audit/findings.csv:9,BLOCKED,AUDIT,2026-10-23
-INC-009,INC,CRRE,缺口管理缺失,crre/audit/findings.csv:10,RESOLVED,AUDIT,2026-10-23
-INC-010,INC,CRRE,证据保管链缺失,crre/audit/findings.csv:11,OPEN,AUDIT,2026-10-23
-INC-011,INC,CRRE,环境隔离不清,crre/audit/findings.csv:12,OPEN,AUDIT,2026-10-23
-INC-012,INC,CRRE,Clean 实测数字进入候选规格,crre/audit/findings.csv:13,RESOLVED,DIRTY,2026-10-23
-INC-013,INC,CRRE,需求来源章节失效且无 OBS 追溯,crre/audit/findings.csv:14,BLOCKED,DIRTY/COUNSEL,2026-10-23
+EV-G0-001,EV,GOV,baseline audit report,governance/registry/evidence.csv:11,RECORDED,ROLE-AUDIT,2026-10-23
+EV-G0-002,EV,GOV,asset provenance and INC impact assessment,governance/registry/evidence.csv,RECORDED,ROLE-AUDIT,2026-10-23
+EV-G1-001,EV,GOV,target 1DM+ 18.2,governance/registry/evidence.csv:2,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-002,EV,GOV,"analysis variant, lab-signed",governance/registry/evidence.csv:3,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-003,EV,GOV,"analysis variant, unsigned",governance/registry/evidence.csv:4,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-004,EV,GOV,tree: 5720 files; decompiled sources + endpoint scans,governance/registry/evidence.csv:5,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-005,EV,GOV,main privacy report,governance/registry/evidence.csv:6,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-006,EV,GOV,frida dynamic evidence,governance/registry/evidence.csv:7,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-007,EV,GOV,tree: 5 files; hook scripts + frida-server,governance/registry/evidence.csv:8,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-008,EV,GOV,tree: 6 files; reproduction scripts,governance/registry/evidence.csv:9,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-009,EV,GOV,tree: 8 files; post-remediation specs snapshot,governance/registry/evidence.csv:10,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G2-001,EV,GOV,candidate package manifest; 70 clauses; OBS-001..018,governance/registry/evidence.csv,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G4-001,EV,GOV,"tree: 6 files; normative spec baseline, legal NOT_REVIEWED",governance/registry/evidence.csv:12,RECORDED,ROLE-CLEAN,2026-10-23
+EV-G4-002,EV,GOV,tree: 50 files; implementation source snapshot,governance/registry/evidence.csv:13,RECORDED,ROLE-CLEAN,2026-10-23
+EV-G4-003,EV,GOV,tree: 15 files; governance package snapshot,governance/registry/evidence.csv:14,RECORDED,ROLE-AUDIT,2026-10-23
+GAP-001,GAP,GOV,全部规格未经法律审查,governance/gaps/GAP-REGISTER.md:14,BLOCKED,AUDIT,2026-10-23
+GAP-002,GAP,GOV,现有实现早于批准规格,governance/gaps/GAP-REGISTER.md:15,BLOCKED,AUDIT,2026-10-23
+GAP-003,GAP,GOV,D1 原始分析含受保护表达,governance/gaps/GAP-REGISTER.md:16,TRIAGED,AUDIT,2026-10-23
+GAP-004,GAP,GOV,历史文档未全量 ID 化,governance/gaps/GAP-REGISTER.md:25,OPEN,AUDIT,2026-10-23
+GAP-005,GAP,GOV,描述性文档仍含规范措辞,governance/gaps/GAP-REGISTER.md:26,OPEN,AUDIT,2026-10-23
+GAP-006,GAP,GOV,分段进度条几何与候选规格逐条对应,governance/gaps/GAP-REGISTER.md:17,BLOCKED,AUDIT,2026-10-23
+GAP-007,GAP,GOV,文件类型表来源标注“原始数据，可直接复用”,governance/gaps/GAP-REGISTER.md:18,BLOCKED,AUDIT,2026-10-23
+GAP-008,GAP,GOV,无独立验证记录,governance/gaps/GAP-REGISTER.md:37,BLOCKED,AUDIT,2026-10-23
+GAP-009,GAP,GOV,无需求→代码追溯矩阵,governance/gaps/GAP-REGISTER.md:27,OPEN,AUDIT,2026-10-23
+GAP-010,GAP,GOV,环境隔离不清,governance/gaps/GAP-REGISTER.md:38,TRIAGED,AUDIT,2026-10-23
+GAP-011,GAP,GOV,候选规格 §7 六态与 §1.1 五态冲突,governance/gaps/GAP-REGISTER.md:28,RESOLVED,AUDIT,2026-10-23
+GAP-012,GAP,GOV,HLS/DASH 只作单文件下载，无分片合并,governance/gaps/GAP-REGISTER.md:49,DEFERRED,AUDIT,2026-10-23
+GAP-013,GAP,GOV,广告过滤不处理内联广告位,governance/gaps/GAP-REGISTER.md:50,DEFERRED,AUDIT,2026-10-23
+GAP-014,GAP,GOV,列表长按多选、添加下载改保存位置未实现,governance/gaps/GAP-REGISTER.md:51,DEFERRED,AUDIT,2026-10-23
+GAP-015,GAP,GOV,P6 飞行模式可用未实测,governance/gaps/GAP-REGISTER.md:39,OPEN,AUDIT,2026-10-23
+GAP-016,GAP,GOV,`ui-design.md` 早期“广告拦截不做”与实现不一致,governance/gaps/GAP-REGISTER.md:29,OPEN,AUDIT,2026-10-23
+GAP-017,GAP,GOV,仅 Wi-Fi / 并发上限未实测,governance/gaps/GAP-REGISTER.md:40,OPEN,AUDIT,2026-10-23
+GAP-018,GAP,GOV,空间不足预检 / 同名并发去重仅代码审阅,governance/gaps/GAP-REGISTER.md:41,OPEN,AUDIT,2026-10-23
+GAP-019,GAP,GOV,release 签名与 `proguard` 规则未实测,governance/gaps/GAP-REGISTER.md:52,DEFERRED,AUDIT,2026-10-23
+GAP-020,GAP,GOV,`logic-spec §15–§18` 与逆向笔记存在可追溯关系,governance/gaps/GAP-REGISTER.md:19,BLOCKED,AUDIT,2026-10-23
+GAP-021,GAP,GOV,验收环境使用 `1DMPlus` AVD 名称,governance/gaps/GAP-REGISTER.md:42,TRIAGED,AUDIT,2026-10-23
+GAP-022,GAP,GOV,`ui-design.md` 交叉引用第 17 部分错误,governance/gaps/GAP-REGISTER.md:30,RESOLVED,AUDIT,2026-10-23
+GAP-023,GAP,GOV,证据清单/哈希缺失,governance/gaps/GAP-REGISTER.md:43,OPEN,AUDIT,2026-10-23
+GAP-024,GAP,GOV,候选规格章节→REQ 映射未落到条款级,governance/gaps/GAP-REGISTER.md:31,OPEN,AUDIT,2026-10-23
+GAP-025,GAP,GOV,`logic-spec §14.4` 自述存在重复格式化实现,governance/gaps/GAP-REGISTER.md:53,OPEN,AUDIT,2026-10-23
+GAP-026,GAP,GOV,需求来源章节失效且无 OBS 追溯,governance/gaps/GAP-REGISTER.md,BLOCKED,AUDIT,2026-10-23
+GAP-027,GAP,GOV,INC-001/INC-012 影响面未闭环,governance/gaps/GAP-REGISTER.md,BLOCKED,AUDIT,2026-10-23
+GAP-028,GAP,GOV,B2/B3 验收为 TODO 且无缺口条目,governance/gaps/GAP-REGISTER.md,OPEN,AUDIT,2026-10-23
+GAP-029,GAP,GOV,302 重定向后的明文 HTTP 策略缺口未登记,governance/gaps/GAP-REGISTER.md,OPEN,AUDIT,2026-10-23
+GAP-030,GAP,GOV,无 torrent/密码管理/主题市场未逐条登记,governance/gaps/GAP-REGISTER.md,DEFERRED,AUDIT,2026-10-23
+INC-001,INC,GOV,Dirty 规格引用 Clean 文档并含实现状态,governance/audit/findings.csv:2,RESOLVED,DIRTY,2026-10-23
+INC-002,INC,GOV,原始表达进入候选规格,governance/audit/findings.csv:3,OPEN,DIRTY,2026-10-23
+INC-003,INC,GOV,实现端 UI 设计文档误存 Dirty 区,governance/audit/findings.csv:4,RESOLVED,DIRTY,2026-10-23
+INC-004,INC,GOV,Clean 设计文档与逆向笔记逐条对应,governance/audit/findings.csv:5,BLOCKED,CLEAN/COUNSEL,2026-10-23
+INC-005,INC,GOV,法律审查从未执行,governance/audit/findings.csv:6,BLOCKED,OWNER,2026-10-23
+INC-006,INC,GOV,稳定 ID 缺失,governance/audit/findings.csv:7,RESOLVED,CLEAN,2026-10-23
+INC-007,INC,GOV,规定性与描述性混装,governance/audit/findings.csv:8,OPEN,CLEAN,2026-10-23
+INC-008,INC,GOV,验证独立性缺失,governance/audit/findings.csv:9,BLOCKED,AUDIT,2026-10-23
+INC-009,INC,GOV,缺口管理缺失,governance/audit/findings.csv:10,RESOLVED,AUDIT,2026-10-23
+INC-010,INC,GOV,证据保管链缺失,governance/audit/findings.csv:11,OPEN,AUDIT,2026-10-23
+INC-011,INC,GOV,环境隔离不清,governance/audit/findings.csv:12,OPEN,AUDIT,2026-10-23
+INC-012,INC,GOV,Clean 实测数字进入候选规格,governance/audit/findings.csv:13,RESOLVED,DIRTY,2026-10-23
+INC-013,INC,GOV,需求来源章节失效且无 OBS 追溯,governance/audit/findings.csv:14,BLOCKED,DIRTY/COUNSEL,2026-10-23
 INV-DL-001,INV,DL,任务级已下载总量 ≥ 所有分片已写字节之和；最多允许一个进度刷新周期的超前。,docs/spec/invariants.md:11,PROPOSED,CLEAN,2026-10-23
 INV-DL-002,INV,DL,续传只读取分片级已写字节，从不把任务级累计值作为锚点。,docs/spec/invariants.md:12,PROPOSED,CLEAN,2026-10-23
 INV-DL-003,INV,DL,所有分片已写字节之和 ≤ 总大小（总大小已知时）。,docs/spec/invariants.md:13,PROPOSED,CLEAN,2026-10-23
 INV-DL-004,INV,DL,"一个任务的所有分片区间恰好覆盖 `[0, total-1]`，无重叠、无空洞；大小未知时只有 1 个哨兵分片。",docs/spec/invariants.md:14,PROPOSED,CLEAN,2026-10-23
-LEG-001,LEG,CRRE,法律审查记录（待签发）,crre/reviews/TEMPLATE-LEGAL.md,OPEN,COUNSEL,2026-10-23
+LEG-001,LEG,GOV,法律审查记录（待签发）,governance/reviews/TEMPLATE-LEGAL.md,OPEN,COUNSEL,2026-10-23
 OBS-001,OBS,DL,任务状态与任务/分片数据模型,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
 OBS-002,OBS,DL,HTTP 能力探测与可分段判定,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
 OBS-003,OBS,DL,分片策略,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
@@ -242,4 +242,4 @@ REQ-UI-008,REQ,UI,已完成任务点击行必须能打开文件；菜单必须�
 REQ-UI-009,REQ,UI,空态、加载态、错误态必须有明确文案，不得只显示空白。,docs/spec/requirements.md:143,PROPOSED,CLEAN,2026-10-23
 REQ-UI-010,REQ,UI,主题必须支持浅色/深色与动态取色；未实现的能力不得以死开关展示。,docs/spec/requirements.md:144,PROPOSED,CLEAN,2026-10-23
 REQ-UI-011,REQ,UI,设置页必须提供下载参数、外观、隐私说明与诊断日志开关。,docs/spec/requirements.md:145,PROPOSED,CLEAN,2026-10-23
-REV-001,REV,CRRE,独立验证记录（待签发）,crre/reviews/TEMPLATE-VERIFICATION.md,OPEN,AUDIT,2026-10-23
+REV-001,REV,GOV,独立验证记录（待签发）,governance/reviews/TEMPLATE-VERIFICATION.md,OPEN,AUDIT,2026-10-23

@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""CRRE integrity check.
+"""治理完整性检查（governance integrity check）.
 
 Run from anywhere:
-    python crre/tools/crre_check.py
-    python crre/tools/crre_check.py --strict-gate
-    python crre/tools/crre_check.py --verify-hashes
+    python governance/tools/governance_check.py
+    python governance/tools/governance_check.py --strict-gate
+    python governance/tools/governance_check.py --verify-hashes
 
 Exit codes:
     0  integrity OK (release gate may still be BLOCKED)
@@ -25,7 +25,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 DIRTY = Path(
     os.environ.get(
-        "CRRE_DIRTY",
+        "GOVERNANCE_DIRTY",
         str(Path.home() / "AppData" / "Roaming" / "reasonix" / "global-workspace" / "1DM+"),
     )
 )
@@ -147,7 +147,7 @@ def check_clean_artifacts() -> None:
                     fail(f"protected target expression {pat!r} in {p.relative_to(ROOT)}")
 
     # Candidate packages are DIRTY material and must not live in the Clean repo.
-    candidate = ROOT / "crre" / "handoff" / "candidate"
+    candidate = ROOT / "governance" / "handoff" / "candidate"
     if candidate.exists():
         packages = [
             q for q in candidate.iterdir()
@@ -158,9 +158,9 @@ def check_clean_artifacts() -> None:
 
 
 def load_registry() -> set[str]:
-    path = ROOT / "crre" / "registry" / "ids.csv"
+    path = ROOT / "governance" / "registry" / "ids.csv"
     if not path.exists():
-        fail("missing crre/registry/ids.csv")
+        fail("missing governance/registry/ids.csv")
         return set()
     ids: set[str] = set()
     with path.open(encoding="utf-8-sig", newline="") as f:
@@ -178,10 +178,10 @@ def check_ids(registry: set[str]) -> None:
     sources = [
         ROOT / "docs" / "spec",
         ROOT / "docs" / "acceptance.md",
-        ROOT / "crre" / "gaps" / "GAP-REGISTER.md",
-        ROOT / "crre" / "audit" / "AUDIT-2026-10-23.md",
-        ROOT / "crre" / "audit" / "findings.csv",
-        ROOT / "crre" / "registry" / "evidence.csv",
+        ROOT / "governance" / "gaps" / "GAP-REGISTER.md",
+        ROOT / "governance" / "audit" / "AUDIT-2026-10-23.md",
+        ROOT / "governance" / "audit" / "findings.csv",
+        ROOT / "governance" / "registry" / "evidence.csv",
     ]
     found: dict[str, str] = {}
     for src in sources:
@@ -213,7 +213,7 @@ def check_ids(registry: set[str]) -> None:
 
 
 def check_gaps() -> None:
-    path = ROOT / "crre" / "gaps" / "GAP-REGISTER.md"
+    path = ROOT / "governance" / "gaps" / "GAP-REGISTER.md"
     if not path.exists():
         fail("missing gap register")
         return
@@ -258,10 +258,10 @@ def check_doc_classes() -> None:
 
 
 def check_legal_and_reviews() -> None:
-    reviews = ROOT / "crre" / "reviews"
+    reviews = ROOT / "governance" / "reviews"
     legs = [p for p in reviews.glob("LEG-*.md")]
     revs = [p for p in reviews.glob("REV-*.md")]
-    approved = ROOT / "crre" / "handoff" / "approved"
+    approved = ROOT / "governance" / "handoff" / "approved"
     approved_docs = [p for p in approved.glob("*") if p.suffix in {".md", ".json"} and p.name != "README.md"]
     if not legs:
         gate_blockers.append("no signed LEG-* legal review")
@@ -277,9 +277,9 @@ def check_legal_and_reviews() -> None:
 
 
 def check_evidence(verify_hashes: bool) -> None:
-    path = ROOT / "crre" / "registry" / "evidence.csv"
+    path = ROOT / "governance" / "registry" / "evidence.csv"
     if not path.exists():
-        warn("crre/registry/evidence.csv is local-only (ignored by git); evidence checks skipped")
+        warn("governance/registry/evidence.csv is local-only (ignored by git); evidence checks skipped")
         return
     with path.open(encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
@@ -308,12 +308,12 @@ def check_evidence(verify_hashes: bool) -> None:
 def check_gate_claims() -> None:
     text = "\n".join(
         read(ROOT / name) for name in ["README.md", "HANDOFF.md", "docs/README.md"]
-    ) + "\n" + "\n".join(read(p) for p in (ROOT / "crre").rglob("*.md"))
+    ) + "\n" + "\n".join(read(p) for p in (ROOT / "governance").rglob("*.md"))
     if "LEGAL-STATUS: NOT_REVIEWED" in text and re.search(r"LEGAL-STATUS:\s*APPROVED", text):
         fail("documents claim LEGAL-STATUS: APPROVED while another document says NOT_REVIEWED")
     if re.search(r"法律审查(结论|状态)[:：]\s*APPROVED", text) and "LEGAL-STATUS: NOT_REVIEWED" in text:
         fail("documents claim an approved legal review while status is NOT_REVIEWED")
-    if "approved/" in text and not list((ROOT / "crre" / "handoff" / "approved").glob("*.md")):
+    if "approved/" in text and not list((ROOT / "governance" / "handoff" / "approved").glob("*.md")):
         warn("documents mention approved/ but the approval package is empty")
 
 

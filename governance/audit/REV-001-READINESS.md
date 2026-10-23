@@ -3,7 +3,7 @@
 > `AUDIT-ID: REV-001-READINESS-2026-10-23`
 > `STATUS: NOT_READY / BLOCKED`
 > `ROLE: ROLE-AUDIT（组织独立验证与复核；本文件不是验证结论）`
-> `注意: 正式记录只能是 crre/reviews/REV-001-*.md，由 REVIEW 签署、AUDIT 会签。`
+> `注意: 正式记录只能是 governance/reviews/REV-001-*.md，由 REVIEW 签署、AUDIT 会签。`
 
 ---
 

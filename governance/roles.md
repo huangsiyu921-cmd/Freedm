@@ -62,7 +62,7 @@
 签名：
 ```
 
-声明存放：`crre/registry/role-declarations/`（不进入公开仓库）。
+声明存放：`governance/registry/role-declarations/`（不进入公开仓库）。
 
 ---
 
@@ -82,6 +82,6 @@
 ## 5. 交流禁令与例外
 
 - **禁止** Dirty ↔ Clean 的任何直接交流（口头、IM、邮件、共享文档、代码注释、提交信息）。
-- 唯一合法通道：`crre/handoff/`。Dirty 只能投递 `candidate/`；COUNSEL 只能投递 `approved/`；Clean 只能读取 `approved/`。
-- 例外：`ROLE-AUDIT` 可以分别询问两侧，但不得把一方的受限信息转述给另一方；询问记录写入 `crre/audit/`。
+- 唯一合法通道：`governance/handoff/`。Dirty 只能投递 `candidate/`；COUNSEL 只能投递 `approved/`；Clean 只能读取 `approved/`。
+- 例外：`ROLE-AUDIT` 可以分别询问两侧，但不得把一方的受限信息转述给另一方；询问记录写入 `governance/audit/`。
 - 违反一次的处置：停止相关门禁、登记 `INC-*`、评估受影响规格/代码范围；在纠正措施完成前不得发布。

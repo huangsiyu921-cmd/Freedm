@@ -3,7 +3,7 @@
 > `AUDIT-ID: LEG-001-READINESS-2026-10-23`
 > `STATUS: NOT_READY / BLOCKED`
 > `ROLE: ROLE-AUDIT（审查组织与独立性检查；不是 COUNSEL，不签发法律意见）`
-> `注意: 本文件不是法律审查记录。正式记录只能是 crre/reviews/LEG-001-*.md，由 COUNSEL 签署。`
+> `注意: 本文件不是法律审查记录。正式记录只能是 governance/reviews/LEG-001-*.md，由 COUNSEL 签署。`
 
 ---
 
@@ -28,12 +28,12 @@
 | 检查 | 结果 |
 |---|---|
 | COUNSEL 是否为实现者/分析者 | 未任命，无法检查 |
-| 是否签署利益冲突声明 | 否；`crre/registry/role-declarations/` 不存在 |
+| 是否签署利益冲突声明 | 否；`governance/registry/role-declarations/` 不存在 |
 | 是否能向 CLEAN 口述被剔除内容 | 无约束记录；须在 `LEG-001` 中书面承诺 |
 | 审查版本是否可固定 | 候选包 manifest SHA-256 `d4d942ac…` 已登记，可固定 |
 
 **独立性结论：不能证明。** 即使现在指定某人，也必须先签署声明并把声明归档到
-`crre/registry/role-declarations/`（不进入公开仓库）。
+`governance/registry/role-declarations/`（不进入公开仓库）。
 
 ## 4. 签发前必须补齐的材料
 

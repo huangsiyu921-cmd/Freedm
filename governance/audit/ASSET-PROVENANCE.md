@@ -22,9 +22,9 @@
    OBS 与条款的对应关系，G0/G1 仍未通过。`GAP-026` 维持 **BLOCKED**（复核未完成）。
 5. 受影响实现模块的独立性同样不能证明，标 **BLOCKED**（`GAP-027`）。
 6. `LEG-001` 与 `REV-001` **均不具备签发条件**：角色未任命、无独立性声明、
-   仓库提交身份单一。未在 `crre/reviews/` 预置 `LEG-*.md` / `REV-*.md`，以免被自动检查
+   仓库提交身份单一。未在 `governance/reviews/` 预置 `LEG-*.md` / `REV-*.md`，以免被自动检查
    误计为“已签发”。资格检查见 `LEG-001-READINESS.md`、`REV-001-READINESS.md`。
-7. `python crre/tools/crre_check.py`：**INTEGRITY PASS**；**GATE BLOCKED**。
+7. `python governance/tools/governance_check.py`：**INTEGRITY PASS**；**GATE BLOCKED**。
    本次新增 2 个 Critical BLOCKED 后，门禁阻塞项由 9 个如实增至 **11 个**。未改任何状态求绿。
 
 ---
@@ -176,7 +176,7 @@
 
 ## 5. 门禁阻塞项处置建议
 
-`crre_check.py` 当前报告 9 个阻塞项（6 个 GAP + 3 个缺件）。本次审计新增 2 个
+`governance_check.py` 当前报告 9 个阻塞项（6 个 GAP + 3 个缺件）。本次审计新增 2 个
 Critical BLOCKED（`GAP-026`、`GAP-027`），实际为 11 个。逐项如下。
 
 | # | 阻塞项 | 谁负责 | 需要什么证据 | 解除条件 |
@@ -194,7 +194,7 @@ Critical BLOCKED（`GAP-026`、`GAP-027`），实际为 11 个。逐项如下。
 | 11 | `GAP-027`（新增）INC-001/012 影响面未闭环 | COUNSEL + AUDIT | 对 §4.2/§4.3 的书面判定；受影响模块独立重设计或书面风险接受 | LEG 结论 + 重设计提交/哈希 + 相关 `REV-*` |
 
 **不得**以修改 `GAP-REGISTER` 状态、预置 `LEG-*.md`/`REV-*.md`、或往 `approved/` 放占位文件
-的方式让 `crre_check.py` 的 GATE 变绿。
+的方式让 `governance_check.py` 的 GATE 变绿。
 
 ---
 
@@ -203,10 +203,10 @@ Critical BLOCKED（`GAP-026`、`GAP-027`），实际为 11 个。逐项如下。
 ### 6.1 共同事实
 
 - `roles.md §4` 人员登记全部为 `TODO` / 未任命；`ROLE-COUNSEL` 与 `ROLE-REVIEW` 均未任命。
-- `crre/registry/role-declarations/` 目录不存在，没有任何签署声明。
+- `governance/registry/role-declarations/` 目录不存在，没有任何签署声明。
 - Clean 仓库提交身份单一（`huangsiyu921-cmd`）。在无法区分人员的情况下，
   “非作者”与“未读源码”都只能靠自我声明，不能靠记录证明。
-- 未创建 `crre/reviews/LEG-001.md` 或 `REV-001.md`：自动检查把“文件存在”当作已签发，
+- 未创建 `governance/reviews/LEG-001.md` 或 `REV-001.md`：自动检查把“文件存在”当作已签发，
   预置模板会造成假通过。
 
 ### 6.2 LEG-001（法律审查）
@@ -247,7 +247,7 @@ Critical BLOCKED（`GAP-026`、`GAP-027`），实际为 11 个。逐项如下。
 
 ```powershell
 cd D:\1DM+
-python crre/tools/crre_check.py
+python governance/tools/governance_check.py
 git diff --check
 ```
 

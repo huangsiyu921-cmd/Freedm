@@ -1,7 +1,7 @@
 # 缺口总账（GAP Register）
 
 > `OWNER: ROLE-AUDIT`
-> 状态机见 `crre/id-policy.md §4`：`OPEN → TRIAGED → RESOLVED / ACCEPTED / DEFERRED / BLOCKED`。
+> 状态机见 `governance/id-policy.md §4`：`OPEN → TRIAGED → RESOLVED / ACCEPTED / DEFERRED / BLOCKED`。
 > **Critical/High 缺口处于 OPEN/BLOCKED 时不得发布。**
 > 每条缺口必须有责任人、证据、关闭证据与解除条件；不得以“已知限制”代替状态。
 > 本次维护（2026-10-23，第二版）：新增 `GAP-026..030`，增加“关闭证据”列；
@@ -92,6 +92,6 @@
 | DEFERRED | 5 |
 | **合计** | **30** |
 
-**发布结论：不通过。** 8 个 `BLOCKED` 中 6 个为 Critical；`crre_check.py` 报告
+**发布结论：不通过。** 8 个 `BLOCKED` 中 6 个为 Critical；`governance_check.py` 报告
 **11 个门禁阻塞项**（8 个 Critical/High BLOCKED + 无 `LEG-*` + 无 `REV-*` + `approved/` 为空）。
 在 `GAP-001/002/006/008/020/026/027` 与 `GAP-007` 关闭前不得对外发布。

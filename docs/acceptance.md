@@ -277,4 +277,4 @@ adb shell cat /storage/emulated/0/Android/data/com.huangsy.freedm.dev/files/logs
 - 无 torrent
 - release 签名与 `proguard` 规则未配置实测
 
-> 以上范围性未实现已登记到 `crre/gaps/GAP-REGISTER.md`，不得以“已知限制”替代处置状态。
+> 以上范围性未实现已登记到 `governance/gaps/GAP-REGISTER.md`，不得以“已知限制”替代处置状态。

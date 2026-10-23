@@ -1,6 +1,6 @@
 # 法律审查记录模板（LEG）
 
-> 复制为 `crre/reviews/LEG-<序号>-<规格包>.md`。只有 COUNSEL 可签署。
+> 复制为 `governance/reviews/LEG-<序号>-<规格包>.md`。只有 COUNSEL 可签署。
 > 本模板不构成法律意见；审查范围与适用法域由 COUNSEL 填写。
 
 ```

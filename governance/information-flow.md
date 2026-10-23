@@ -22,7 +22,7 @@ flowchart LR
 
   subgraph L["法律审查（独立）"]
     R["审查清单 + 剔除记录"]
-    A["批准规格包<br/>crre/handoff/approved/"]
+    A["批准规格包<br/>governance/handoff/approved/"]
   end
 
   subgraph C2["Clean 区"]
@@ -56,11 +56,11 @@ flowchart LR
 | 通道 | 方向 | 内容 | 载体 | 访问控制 |
 |---|---|---|---|---|
 | CH-1 观察 | 目标 → Dirty | APK、反编译、抓包、截图、日志 | Dirty 工作区 `apk/ dex/ reports/ frida/` | 仅 DIRTY + AUDIT |
-| CH-2 候选规格 | Dirty → COUNSEL | 行为条款、ID、验证方法；**无**代码/命名/布局 | `crre/handoff/candidate/`（或 Dirty `specs/` 的 `CAND` 文件） | DIRTY 写，COUNSEL/AUDIT 读 |
-| CH-3 审查记录 | COUNSEL → AUDIT/OWNER | 逐条接受/剔除/理由 | `crre/reviews/LEG-*.md` | COUNSEL 写，AUDIT/OWNER 读 |
-| CH-4 批准规格 | COUNSEL → CLEAN | 清洗后的规格 + 条款 ID + 验收映射 | `crre/handoff/approved/`（只读） | COUNSEL 写，CLEAN/AUDIT 读 |
-| CH-5 缺口 | CLEAN/AUDIT → 总账 | 规格与实现不一致；只写条款 ID 与行为差异 | `crre/gaps/GAP-REGISTER.md` | CLEAN 写，AUDIT 审 |
-| CH-6 验证 | REVIEW → AUDIT | 按 ACC ID 的 PASS/FAIL、环境、证据 | `crre/reviews/REV-*.md` | REVIEW 写，AUDIT 读 |
+| CH-2 候选规格 | Dirty → COUNSEL | 行为条款、ID、验证方法；**无**代码/命名/布局 | `governance/handoff/candidate/`（或 Dirty `specs/` 的 `CAND` 文件） | DIRTY 写，COUNSEL/AUDIT 读 |
+| CH-3 审查记录 | COUNSEL → AUDIT/OWNER | 逐条接受/剔除/理由 | `governance/reviews/LEG-*.md` | COUNSEL 写，AUDIT/OWNER 读 |
+| CH-4 批准规格 | COUNSEL → CLEAN | 清洗后的规格 + 条款 ID + 验收映射 | `governance/handoff/approved/`（只读） | COUNSEL 写，CLEAN/AUDIT 读 |
+| CH-5 缺口 | CLEAN/AUDIT → 总账 | 规格与实现不一致；只写条款 ID 与行为差异 | `governance/gaps/GAP-REGISTER.md` | CLEAN 写，AUDIT 审 |
+| CH-6 验证 | REVIEW → AUDIT | 按 ACC ID 的 PASS/FAIL、环境、证据 | `governance/reviews/REV-*.md` | REVIEW 写，AUDIT 读 |
 
 ---
 
@@ -104,7 +104,7 @@ flowchart LR
 2. **遏制**：停止相关门禁；把受影响文档移入隔离区（`specs/_quarantine/` 或 Dirty 侧），加 `DO-NOT-READ` 标记。
 3. **范围评估**：确定哪些 `REQ-*`/代码模块可能受影响；不能证明独立性的，标 `BLOCKED`。
 4. **纠正**：删除反向内容；必要时由 COUNSEL 重新审查或由 CLEAN 独立重设计。
-5. **验证**：`crre_check.py` 通过 + AUDIT 签署；未关闭前不得发布。
+5. **验证**：`governance_check.py` 通过 + AUDIT 签署；未关闭前不得发布。
 6. **记录**：事件、根因、影响、措施写入审计报告与缺口总账。
 
 ---
@@ -117,6 +117,6 @@ flowchart LR
 - Clean 构建机不安装目标 APK，不使用装有目标的 AVD；
 - 测试设备/AVD 命名不得复用 Dirty 环境名；
 - 所有跨区文件移动由 AUDIT 执行并记录哈希；
-- `crre_check.py` 每次门禁前运行，结果归档 `EV-*`。
+- `governance_check.py` 每次门禁前运行，结果归档 `EV-*`。
 
 > 这些是补偿控制，不替代真正的账号/主机隔离。若监管或诉讼场景要求更强证明，应使用独立主机与独立账户。

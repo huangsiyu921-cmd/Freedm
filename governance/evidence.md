@@ -12,7 +12,7 @@ EV-<阶段>-<序号>-<短名>
 例：EV-G1-001-apk-hash、EV-G5-003-dl-resume
 ```
 
-每条证据在 `crre/registry/evidence.csv` 登记：
+每条证据在 `governance/registry/evidence.csv` 登记：
 
 | 字段 | 说明 |
 |---|---|
@@ -113,4 +113,4 @@ EV-<阶段>-<序号>-<短名>
 
 ## 5. 当前证据快照
 
-审计基准日的文件哈希见 `crre/audit/AUDIT-2026-10-23.md` 与 Dirty 侧 `reports/EVIDENCE-MANIFEST.csv`。
+审计基准日的文件哈希见 `governance/audit/AUDIT-2026-10-23.md` 与 Dirty 侧 `reports/EVIDENCE-MANIFEST.csv`。

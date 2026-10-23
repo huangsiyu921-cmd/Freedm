@@ -4,7 +4,7 @@
 > `BASELINE: SPEC-BASELINE-2026-10-23`
 > `LEGAL-STATUS: NOT_REVIEWED / BLOCKED`
 
-本目录是 FreeDM 的**唯一规范来源**（在 `crre/handoff/approved/` 为空期间的整改基线）。
+本目录是 FreeDM 的**唯一规范来源**（在 `governance/handoff/approved/` 为空期间的整改基线）。
 描述性设计文档不得单独产生约束。
 
 | 文件 | 内容 | ID 前缀 |

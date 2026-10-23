@@ -24,9 +24,9 @@ captures/
 .DS_Store
 Thumbs.db
 
-# CRRE 证据清单含目标材料元数据（本地审计保存，不入库）
-crre/registry/evidence.csv
+# 治理证据清单含目标材料元数据（本地审计保存，不入库）
+governance/registry/evidence.csv
 
 # 候选/退回包属于 Dirty 材料，不得进入 Clean 仓库版本控制
-crre/handoff/candidate/CAND-*/
-crre/handoff/rejected/CAND-*/
+governance/handoff/candidate/CAND-*/
+governance/handoff/rejected/CAND-*/

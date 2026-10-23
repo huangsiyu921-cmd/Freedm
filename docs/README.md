@@ -30,13 +30,13 @@
 
 | 文档 | 内容 |
 |---|---|
-| [`../crre/README.md`](../crre/README.md) | CRRE 治理入口、权威顺序、当前门禁状态 |
-| [`../crre/roles.md`](../crre/roles.md) | 角色、访问边界、RACI |
-| [`../crre/information-flow.md`](../crre/information-flow.md) | 单向信息流、交接区、污染处置 |
-| [`../crre/gates.md`](../crre/gates.md) | G0–G6 准入/准出 |
-| [`../crre/evidence.md`](../crre/evidence.md) | 证据留存与保管链 |
-| [`../crre/gaps/GAP-REGISTER.md`](../crre/gaps/GAP-REGISTER.md) | 规格-实现缺口总账 |
-| [`../crre/reviews/`](../crre/reviews/) | 独立验证与法律审查模板 |
+| [`../governance/README.md`](../governance/README.md) | 治理入口、权威顺序、当前门禁状态 |
+| [`../governance/roles.md`](../governance/roles.md) | 角色、访问边界、RACI |
+| [`../governance/information-flow.md`](../governance/information-flow.md) | 单向信息流、交接区、污染处置 |
+| [`../governance/gates.md`](../governance/gates.md) | G0–G6 准入/准出 |
+| [`../governance/evidence.md`](../governance/evidence.md) | 证据留存与保管链 |
+| [`../governance/gaps/GAP-REGISTER.md`](../governance/gaps/GAP-REGISTER.md) | 规格-实现缺口总账 |
+| [`../governance/reviews/`](../governance/reviews/) | 独立验证与法律审查模板 |
 
 ## 4. 想快速做事
 

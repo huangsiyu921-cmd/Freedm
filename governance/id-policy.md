@@ -36,7 +36,7 @@
 2. `status`：`DRAFT` / `PROPOSED` / `APPROVED` / `IMPLEMENTED` / `VERIFIED` / `WITHDRAWN`。
 3. 修改条款正文不改变 ID；改变语义则新建 ID，并在旧 ID 上标 `WITHDRAWN` + `superseded_by`。
 4. 废弃 ID 写入 `registry/retired-ids.txt`，永久保留。
-5. 自动检查：`crre_check.py` 校验重复、未登记、退役 ID 被复用、验收缺 ID。
+5. 自动检查：`governance_check.py` 校验重复、未登记、退役 ID 被复用、验收缺 ID。
 
 ---
 

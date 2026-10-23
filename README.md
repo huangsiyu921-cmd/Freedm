@@ -1,13 +1,15 @@
 # FreeDM
 
-从零重写的 Android 下载管理器 —— 替代闭源的 1DM+，**零数据收集**，Material 3 界面。
+独立实现的 Android 下载管理器，与 1DM+ 的下载与浏览行为互操作，**零数据收集**，Material 3 界面。
 
-> 净室实现：代码全部原创，未复用任何反编译产物。行为规格来自对 1DM+ 18.2 的
-> 黑盒观察与静态分析结论，逆向证据不随仓库分发。
+> **项目性质（2026-10-23）**
+> 本项目在开发过程中对目标软件进行了逆向分析，用于理解其功能和协议。分析所得信息仅用于实现互操作性功能。
+> 本项目未经法律审查，未经第三方审计，不声称符合任何特定的法律合规开发标准。
+> 本项目未复制目标软件的源代码或受版权保护的表达，但不能保证法律上无风险。
 >
 > **合规状态（2026-10-23）**：法律审查 `NOT_REVIEWED`，独立验证未执行；当前版本
-> **不得对外发布**。治理入口 [`crre/README.md`](crre/README.md)，缺口见
-> [`crre/gaps/GAP-REGISTER.md`](crre/gaps/GAP-REGISTER.md)。
+> **不得对外发布**。治理入口 [`governance/README.md`](governance/README.md)，缺口见
+> [`governance/gaps/GAP-REGISTER.md`](governance/gaps/GAP-REGISTER.md)。
 >
 > **规范来源**：[`docs/spec/`](docs/spec/) 是唯一权威；`docs/logic-spec.md` 等为
 > INFORMATIVE 设计说明。所有需求/不变量/错误/验收使用稳定 `REQ-*`/`INV-*`/`ERR-*`/`ACC-*` ID。
@@ -84,13 +86,13 @@ docs/     README.md（文档导读：先规范、后设计）
           known-pitfalls.md（INFORMATIVE：真实踩坑）
           ui-design.md（INFORMATIVE：界面设计）
           evidence-resume-server.log（续传实测的服务器原始日志）
-crre/     CRRE 治理：角色、信息流、门禁、证据、缺口、ID 注册表、审查模板
+governance/     治理：角色、信息流、门禁、证据、缺口、ID 注册表、审查模板
 ```
 
 ## 实现者自测（非独立验证）
 
 > 以下结果由实现者执行，**不能替代 G5 独立验证**。独立评审者必须不是作者、且未阅读实现
-> 文档或源码；当前 `REV-001` 尚未签发。详见 `docs/acceptance.md` 与 `crre/gates.md`。
+> 文档或源码；当前 `REV-001` 尚未签发。详见 `docs/acceptance.md` 与 `governance/gates.md`。
 
 测试源用 `tools/range_server.py`（本机 Range 服务器，记录每个请求），文件 50 MiB。
 

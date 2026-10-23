@@ -1,15 +1,17 @@
-# CRRE 治理包（Clean-Room Reverse Engineering）
+# 受控再实现治理包（Controlled Reimplementation Governance）
 
-> 状态：**审计整改中**。本包定义流程与证据要求，不代表任何法律结论。
-> 适用对象：1DM+ 18.2 的互操作性/隐私研究与 FreeDM 的净室重实现。
-> 治理包版本：`CRRE-GOV-0.1.0`（2026-10-23）
+> 状态：**审计整改中**。本目录是内部流程与证据文档，不是对外合规声明，也不代表任何法律结论。
+> 本流程按角色隔离与单向信息流设计，但**未经法律审查和第三方审计**，不声称已构成
+> 任何特定的合规开发流程。
+> 适用对象：1DM+ 18.2 的互操作性/隐私研究与 FreeDM 的独立重实现。
+> 治理包版本：`GOV-0.1.0`（2026-10-23）
 > 规范基线：`SPEC-BASELINE-2026-10-23`（见 `docs/spec/`）
 
 ---
 
 ## 1. 这个包解决什么问题
 
-没有流程证据的“净室”只是自我声明。本包把净室拆成可检查的门禁：
+没有流程证据的“隔离”只是自我声明。本包把角色隔离与单向信息流拆成可检查的门禁：
 
 1. **谁可以看什么**（`roles.md`）；
 2. **信息往哪个方向流**（`information-flow.md`）；
@@ -19,7 +21,7 @@
 6. **规格与实现不一致如何登记和关闭**（`gaps/GAP-REGISTER.md`）；
 7. **谁独立验证、谁不能验证**（`reviews/`）。
 
-自动检查：`python crre/tools/crre_check.py`（在仓库根运行）。
+自动检查：`python governance/tools/governance_check.py`（在仓库根运行）。
 
 ---
 
@@ -29,7 +31,7 @@
 
 | 优先级 | 文档 | 性质 |
 |---|---|---|
-| 1 | 经法律审查并签发的 `crre/handoff/approved/` 规格包 | 唯一可交付给实现组的规格 |
+| 1 | 经法律审查并签发的 `governance/handoff/approved/` 规格包 | 唯一可交付给实现组的规格 |
 | 2 | `docs/spec/requirements.md`、`invariants.md`、`errors.md`、`privacy.md` | 规范性（MUST/SHALL），当前为**待审基线** |
 | 3 | `docs/acceptance.md` | 规范性验收 |
 | 4 | `docs/logic-spec.md`、`docs/implementation-guide.md`、`docs/ui-design.md` | 描述性设计（INFORMATIVE），不得单独产生约束 |
@@ -42,7 +44,7 @@
 ## 3. 目录
 
 ```
-crre/
+governance/
 ├── README.md                 治理入口
 ├── roles.md                  角色、访问矩阵、利益冲突
 ├── information-flow.md       信息流图、单向通道、交换区、污染处置
@@ -54,7 +56,7 @@ crre/
 ├── handoff/                  规格交接区（approved/ 只读）
 ├── registry/                 ID 注册表与退役表
 ├── reviews/                  独立验证 / 法律审查记录模板
-└── tools/crre_check.py       自动一致性检查
+└── tools/governance_check.py       自动一致性检查
 ```
 
 ---
@@ -74,6 +76,6 @@ crre/
 
 ## 5. 变更控制
 
-- 治理文档本身变更需记录 `CRRE-CHANGE-*`，写入 `audit/`，并说明影响的门禁。
+- 治理文档本身变更需记录 `CTRL-*`，写入 `audit/`，并说明影响的门禁。
 - 规范条款变更只能新增 ID 或修改条款正文；ID 永不复用。废弃 ID 写入 `registry/retired-ids.txt`。
 - 任何“先实现、后补规格”的路径均视为违规，登记为 `INC-*` 与 `GAP-*`，不得以文档追认代替法律审查。

@@ -149,7 +149,7 @@
 
 ## 门禁状态记录
 
-每次过 gate 在 `crre/audit/GATE-LOG.md` 追加一行：
+每次过 gate 在 `governance/audit/GATE-LOG.md` 追加一行：
 
 ```
 日期 | 门禁 | 版本/提交 | 结论(PASS/FAIL/BLOCKED) | 证据 ID | 签署人
