@@ -51,6 +51,10 @@ CONST-DL-014,CONST,DL,测速窗口,docs/spec/constants.md:24,PROPOSED,CLEAN,2026
 CONST-DL-015,CONST,DL,文件名长度上限,docs/spec/constants.md:25,PROPOSED,CLEAN,2026-10-23
 CONST-DL-016,CONST,DL,重名后缀上限,docs/spec/constants.md:26,PROPOSED,CLEAN,2026-10-23
 CONST-DL-017,CONST,DL,诊断日志轮转上限,docs/spec/constants.md:27,PROPOSED,CLEAN,2026-10-23
+DEC-001,DEC,UI,起始页卡片堆/展开/回收动画为 Clean 独立设计,crre/audit/ASSET-PROVENANCE.md,PROPOSED,CLEAN,2026-10-23
+DEC-002,DEC,UI,广告过滤简化为仅主机名、随包规则、拒绝复杂语法,CAND-DL-001-notes.md §5.1,PROPOSED,ROLE-DIRTY,2026-10-23
+DEC-003,DEC,UI,下载确认筛选面板可折叠、默认收起,CAND-DL-001-notes.md §5.1,PROPOSED,ROLE-DIRTY,2026-10-23
+DEC-004,DEC,UI,音频容器转换是否保留待定,CAND-DL-001-notes.md §6,PROPOSED,ROLE-DIRTY,2026-10-23
 ERR-BR-001,ERR,BR,注入脚本返回值被二次编码,docs/spec/errors.md:24,PROPOSED,CLEAN,2026-10-23
 ERR-BR-002,ERR,BR,广告规则文件缺失或加载失败,docs/spec/errors.md:25,PROPOSED,CLEAN,2026-10-23
 ERR-DL-001,ERR,DL,探测请求失败、超时或被拒绝,docs/spec/errors.md:12,PROPOSED,CLEAN,2026-10-23
@@ -67,6 +71,7 @@ ERR-DL-011,ERR,DL,删除正在运行的任务,docs/spec/errors.md:22,PROPOSED,CL
 ERR-DL-012,ERR,DL,数据库中的状态值无法反序列化,docs/spec/errors.md:23,PROPOSED,CLEAN,2026-10-23
 ERR-SH-001,ERR,SH,分享内容没有可解析的 http(s) URL,docs/spec/errors.md:26,PROPOSED,CLEAN,2026-10-23
 EV-G0-001,EV,CRRE,baseline audit report,crre/registry/evidence.csv:11,RECORDED,ROLE-AUDIT,2026-10-23
+EV-G0-002,EV,CRRE,asset provenance and INC impact assessment,crre/registry/evidence.csv,RECORDED,ROLE-AUDIT,2026-10-23
 EV-G1-001,EV,CRRE,target 1DM+ 18.2,crre/registry/evidence.csv:2,RECORDED,ROLE-DIRTY,2026-10-23
 EV-G1-002,EV,CRRE,"analysis variant, lab-signed",crre/registry/evidence.csv:3,RECORDED,ROLE-DIRTY,2026-10-23
 EV-G1-003,EV,CRRE,"analysis variant, unsigned",crre/registry/evidence.csv:4,RECORDED,ROLE-DIRTY,2026-10-23
@@ -76,6 +81,7 @@ EV-G1-006,EV,CRRE,frida dynamic evidence,crre/registry/evidence.csv:7,RECORDED,R
 EV-G1-007,EV,CRRE,tree: 5 files; hook scripts + frida-server,crre/registry/evidence.csv:8,RECORDED,ROLE-DIRTY,2026-10-23
 EV-G1-008,EV,CRRE,tree: 6 files; reproduction scripts,crre/registry/evidence.csv:9,RECORDED,ROLE-DIRTY,2026-10-23
 EV-G1-009,EV,CRRE,tree: 8 files; post-remediation specs snapshot,crre/registry/evidence.csv:10,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G2-001,EV,CRRE,candidate package manifest; 70 clauses; OBS-001..018,crre/registry/evidence.csv,RECORDED,ROLE-DIRTY,2026-10-23
 EV-G4-001,EV,CRRE,"tree: 6 files; normative spec baseline, legal NOT_REVIEWED",crre/registry/evidence.csv:12,RECORDED,ROLE-CLEAN,2026-10-23
 EV-G4-002,EV,CRRE,tree: 50 files; implementation source snapshot,crre/registry/evidence.csv:13,RECORDED,ROLE-CLEAN,2026-10-23
 EV-G4-003,EV,CRRE,tree: 15 files; governance package snapshot,crre/registry/evidence.csv:14,RECORDED,ROLE-AUDIT,2026-10-23
@@ -104,6 +110,11 @@ GAP-022,GAP,CRRE,`ui-design.md` 交叉引用第 17 部分错误,crre/gaps/GAP-RE
 GAP-023,GAP,CRRE,证据清单/哈希缺失,crre/gaps/GAP-REGISTER.md:43,OPEN,AUDIT,2026-10-23
 GAP-024,GAP,CRRE,候选规格章节→REQ 映射未落到条款级,crre/gaps/GAP-REGISTER.md:31,OPEN,AUDIT,2026-10-23
 GAP-025,GAP,CRRE,`logic-spec §14.4` 自述存在重复格式化实现,crre/gaps/GAP-REGISTER.md:53,OPEN,AUDIT,2026-10-23
+GAP-026,GAP,CRRE,需求来源章节失效且无 OBS 追溯,crre/gaps/GAP-REGISTER.md,BLOCKED,AUDIT,2026-10-23
+GAP-027,GAP,CRRE,INC-001/INC-012 影响面未闭环,crre/gaps/GAP-REGISTER.md,BLOCKED,AUDIT,2026-10-23
+GAP-028,GAP,CRRE,B2/B3 验收为 TODO 且无缺口条目,crre/gaps/GAP-REGISTER.md,OPEN,AUDIT,2026-10-23
+GAP-029,GAP,CRRE,302 重定向后的明文 HTTP 策略缺口未登记,crre/gaps/GAP-REGISTER.md,OPEN,AUDIT,2026-10-23
+GAP-030,GAP,CRRE,无 torrent/密码管理/主题市场未逐条登记,crre/gaps/GAP-REGISTER.md,DEFERRED,AUDIT,2026-10-23
 INC-001,INC,CRRE,Dirty 规格引用 Clean 文档并含实现状态,crre/audit/findings.csv:2,RESOLVED,DIRTY,2026-10-23
 INC-002,INC,CRRE,原始表达进入候选规格,crre/audit/findings.csv:3,OPEN,DIRTY,2026-10-23
 INC-003,INC,CRRE,实现端 UI 设计文档误存 Dirty 区,crre/audit/findings.csv:4,RESOLVED,DIRTY,2026-10-23
@@ -116,11 +127,30 @@ INC-009,INC,CRRE,缺口管理缺失,crre/audit/findings.csv:10,RESOLVED,AUDIT,20
 INC-010,INC,CRRE,证据保管链缺失,crre/audit/findings.csv:11,OPEN,AUDIT,2026-10-23
 INC-011,INC,CRRE,环境隔离不清,crre/audit/findings.csv:12,OPEN,AUDIT,2026-10-23
 INC-012,INC,CRRE,Clean 实测数字进入候选规格,crre/audit/findings.csv:13,RESOLVED,DIRTY,2026-10-23
+INC-013,INC,CRRE,需求来源章节失效且无 OBS 追溯,crre/audit/findings.csv:14,BLOCKED,DIRTY/COUNSEL,2026-10-23
 INV-DL-001,INV,DL,任务级已下载总量 ≥ 所有分片已写字节之和；最多允许一个进度刷新周期的超前。,docs/spec/invariants.md:11,PROPOSED,CLEAN,2026-10-23
 INV-DL-002,INV,DL,续传只读取分片级已写字节，从不把任务级累计值作为锚点。,docs/spec/invariants.md:12,PROPOSED,CLEAN,2026-10-23
 INV-DL-003,INV,DL,所有分片已写字节之和 ≤ 总大小（总大小已知时）。,docs/spec/invariants.md:13,PROPOSED,CLEAN,2026-10-23
 INV-DL-004,INV,DL,"一个任务的所有分片区间恰好覆盖 `[0, total-1]`，无重叠、无空洞；大小未知时只有 1 个哨兵分片。",docs/spec/invariants.md:14,PROPOSED,CLEAN,2026-10-23
 LEG-001,LEG,CRRE,法律审查记录（待签发）,crre/reviews/TEMPLATE-LEGAL.md,OPEN,COUNSEL,2026-10-23
+OBS-001,OBS,DL,任务状态与任务/分片数据模型,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-002,OBS,DL,HTTP 能力探测与可分段判定,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-003,OBS,DL,分片策略,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-004,OBS,DL,断点续传与进度落库,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-005,OBS,DL,队列、并发、限速与仅 Wi-Fi,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-006,OBS,DL,文件名推导与清洗,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-007,OBS,DL,完成校验与通知,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-008,OBS,DL,媒体嗅探,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-009,OBS,DL,分享接收与剪贴板,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-010,OBS,DL,存储布局与数据库,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-011,OBS,DL,启动即读取设备标识并上报,EV-G1-005;EV-G1-006,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-012,OBS,DL,权限清单与不必要权限,EV-G1-005,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-013,OBS,DL,广告过滤规则类型与来源,D1-ADB,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-014,OBS,DL,文件类型判定与默认目录,D1-FT,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-015,OBS,DL,下载确认界面结构,D1-UI-C,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-016,OBS,DL,分段进度呈现,D1-UI-P,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-017,OBS,DL,限速稳态吞吐（推断）,none,RECORDED,ROLE-DIRTY,2026-10-23
+OBS-018,OBS,DL,错误条件,EV-G1-004,RECORDED,ROLE-DIRTY,2026-10-23
 PRV-001,PRV,001,不得集成任何分析、统计、崩溃上报或归因 SDK；依赖清单中不得出现 firebase、crashlytics、umeng、bugly、adjust、installreferrer 等。,docs/spec/privacy.md:11,PROPOSED,CLEAN,2026-10-23
 PRV-002,PRV,002,不得读取 `ANDROID_ID`、IMEI、MEID、序列号、MAC、SIM/运营商信息。,docs/spec/privacy.md:12,PROPOSED,CLEAN,2026-10-23
 PRV-003,PRV,003,不得使用安装来源归因（InstallReferrer）。,docs/spec/privacy.md:13,PROPOSED,CLEAN,2026-10-23

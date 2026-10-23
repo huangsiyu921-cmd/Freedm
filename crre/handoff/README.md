@@ -22,6 +22,6 @@ handoff/
 
 | 目录 | 内容 | 状态 |
 |---|---|---|
-| `candidate/` | 空（待从 Dirty `specs/` 投递） | 未投递 |
+| `candidate/` | 仅说明文件；`CAND-DL-001` v1.0.0 位于 Dirty 工作区 `handoff/candidate/CAND-DL-001/` | 已投递到 Dirty；本仓库不保存候选包 |
 | `approved/` | 空 | **无批准规格；CLEAN 不得据此新增实现** |
 | `rejected/` | 空 | — |

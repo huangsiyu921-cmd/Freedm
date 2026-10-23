@@ -146,6 +146,16 @@ def check_clean_artifacts() -> None:
                 if re.search(pat, body):
                     fail(f"protected target expression {pat!r} in {p.relative_to(ROOT)}")
 
+    # Candidate packages are DIRTY material and must not live in the Clean repo.
+    candidate = ROOT / "crre" / "handoff" / "candidate"
+    if candidate.exists():
+        packages = [
+            q for q in candidate.iterdir()
+            if (q.is_dir() and q.name.startswith("CAND-")) or (q.is_file() and q.name.startswith("CAND-"))
+        ]
+        for q in packages:
+            fail(f"candidate spec package inside clean workspace: {q.relative_to(ROOT)}")
+
 
 def load_registry() -> set[str]:
     path = ROOT / "crre" / "registry" / "ids.csv"
@@ -153,7 +163,7 @@ def load_registry() -> set[str]:
         fail("missing crre/registry/ids.csv")
         return set()
     ids: set[str] = set()
-    with path.open(encoding="utf-8", newline="") as f:
+    with path.open(encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             ident = row.get("id", "")
             if not ident:
@@ -271,7 +281,7 @@ def check_evidence(verify_hashes: bool) -> None:
     if not path.exists():
         warn("crre/registry/evidence.csv is local-only (ignored by git); evidence checks skipped")
         return
-    with path.open(encoding="utf-8", newline="") as f:
+    with path.open(encoding="utf-8-sig", newline="") as f:
         rows = list(csv.DictReader(f))
     if not rows:
         fail("evidence registry is empty")

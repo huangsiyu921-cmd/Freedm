@@ -11,3 +11,4 @@ INC-009,Medium,缺口管理缺失,TODO/已知限制散落无状态,RESOLVED,建�
 INC-010,Medium,证据保管链缺失,APK/DEX/Frida 无统一哈希清单,OPEN,生成 EVIDENCE-MANIFEST 与 evidence.csv,AUDIT
 INC-011,High,环境隔离不清,acceptance 使用 1DMPlus AVD,OPEN,改用独立 AVD/设备并记录安装包,AUDIT
 INC-012,Critical,Clean 实测数字进入候选规格,behavior-spec §7 的 459/500 KB/s 与 6 段实测,RESOLVED,随 §7/§8 删除并隔离,DIRTY
+INC-013,Critical,需求来源章节失效且无 OBS 追溯,REQ-UI-001..011 引已删除的 CAND §8；REQ-SH-005 引 §7；REQ-BR-007..012 来源与内容不符；全包无 OBS-*,BLOCKED,DIRTY 重投候选规格并逐条标注真实章节与 OBS；COUNSEL 书面确认映射,DIRTY/COUNSEL
