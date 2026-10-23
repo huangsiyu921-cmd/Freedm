@@ -1,7 +1,14 @@
 # 实现指南 — 各部分怎么接起来
 
-`behavior-spec.md` 描述"系统该表现成什么样"，`ui-spec.md` 描述"界面长什么样"。
-**本文描述"代码怎么接"** —— 状态由谁能改、每个用户动作的完整调用序列、线程模型、常量取值。
+> `DOCUMENT-CLASS: INFORMATIVE DESIGN`
+> `BASELINE: SPEC-BASELINE-2026-10-23`
+> `AUTHORITY: docs/spec/`（本文不产生规范约束）
+> `LEGAL-STATUS: NOT_REVIEWED`
+
+`docs/spec/requirements.md` 描述"系统必须表现成什么样"，`docs/ui-design.md` 描述"界面怎么设计"。
+**本文描述"代码怎么接"** —— 状态由谁能改、每个用户动作的完整调用序列、线程模型、
+以及影响可观察行为的常量解释。常量权威值见 `docs/spec/constants.md`；本文若与规范冲突，
+以规范为准并登记 `GAP-*`。
 
 只读前两份文档能写出大致功能，但会在下面这些地方分叉：状态迁移写错导致自动恢复误伤、
 调用序列漏一步导致按钮没反应、常量各取各的值导致行为不一致。
@@ -150,7 +157,10 @@ Engine.pauseAll()
 
 ---
 
-## 4. 常量表（必须照抄，否则行为不一致）
+## 4. 常量表（权威值见 `docs/spec/constants.md`）
+
+> 下表解释常量的用途；**规范性值以 `docs/spec/constants.md` 的 `CONST-*` 为准**。
+> 修改常量必须先改规范并记录 `CTRL-*`，不得只改代码。
 
 | 常量 | 值 | 用途 |
 |---|---|---|

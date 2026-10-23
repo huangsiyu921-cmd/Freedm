@@ -1,8 +1,17 @@
 # 逐逻辑实现规格（Logic Spec）
 
-> 粒度目标：不看源码，只按本文就能逐行写出等价实现。
+> `DOCUMENT-CLASS: INFORMATIVE DESIGN`
+> `BASELINE: SPEC-BASELINE-2026-10-23`
+> `AUTHORITY: docs/spec/`（本文不产生规范约束）
+> `LEGAL-STATUS: NOT_REVIEWED`
+>
+> 粒度目标：解释现有设计如何满足规范，便于维护与复查。
 > 每个函数给出 **签名 / 前置条件 / 步骤 / 副作用 / 边界 / 为什么**。
 > 伪代码用语言无关写法；`→` 表示赋值，`⊥` 表示返回/中止。
+>
+> ⚠️ 第 15–18 部分涉及进度条几何、多选确认、文件类型表、广告过滤，与候选规格存在
+> 可追溯关系。在 `LEG-001` 完成前，不得把这些章节作为新实现依据，也不得继续复制其中的
+> 数值、结构或选择。权威条款见 `docs/spec/`，冲突时以规范为准并登记 `GAP-*`。
 
 ---
 
@@ -41,10 +50,10 @@ SQLite (downloads.db)          ← 唯一真相源，进程死亡后唯一幸存
 Engine.progress: StateFlow<Map<taskId, TaskProgress>>   ← 纯内存，进程死即消失
 ```
 
-**不变量 I1**：`download.downloaded` ≥ `Σ segment.downloaded`，最多超前一个 tick。
-**不变量 I2**：续传**只**读 `segment.downloaded`，从不读 `download.downloaded`。
-**不变量 I3**：`Σ segment.downloaded` ≤ `download.total_bytes`（若 total>0）。
-**不变量 I4**：一个任务的所有 segment 区间恰好覆盖 `[0, total-1]`，无重叠。
+**不变量 INV-DL-001（历史别名 I1）**：`download.downloaded` ≥ `Σ segment.downloaded`，最多超前一个 tick。
+**不变量 INV-DL-002（历史别名 I2）**：续传**只**读 `segment.downloaded`，从不读 `download.downloaded`。
+**不变量 INV-DL-003（历史别名 I3）**：`Σ segment.downloaded` ≤ `download.total_bytes`（若 total>0）。
+**不变量 INV-DL-004（历史别名 I4）**：一个任务的所有 segment 区间恰好覆盖 `[0, total-1]`，无重叠。
 
 ---
 

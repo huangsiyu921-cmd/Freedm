@@ -1,0 +1,215 @@
+id,type,domain,title,source,status,owner,created_at
+ACC-BLD-001,ACC,BLD,ACC-BLD-001 · A1 构建 — `PASS`,docs/acceptance.md:21,PROPOSED,CLEAN,2026-10-23
+ACC-BR-001,ACC,BR,ACC-BR-001 · B1 分享接收 — `PASS`,docs/acceptance.md:190,PROPOSED,CLEAN,2026-10-23
+ACC-BR-002,ACC,BR,ACC-BR-002 · B2 媒体嗅探（DOM + 网络层） — `TODO`,docs/acceptance.md:198,PROPOSED,CLEAN,2026-10-23
+ACC-BR-003,ACC,BR,ACC-BR-003 · B3 剪贴板识别 — `TODO`（需注入剪贴板内容）,docs/acceptance.md:203,PROPOSED,CLEAN,2026-10-23
+ACC-BR-004,ACC,BR,ACC-BR-004 · B4 广告过滤 — `PASS`,docs/acceptance.md:209,PROPOSED,CLEAN,2026-10-23
+ACC-BR-005,ACC,BR,ACC-BR-005 · B5 诊断日志 — `PASS`,docs/acceptance.md:226,PROPOSED,CLEAN,2026-10-23
+ACC-BR-006,ACC,BR,ACC-BR-006 · B6 视觉一致性 — `PASS`,docs/acceptance.md:243,PROPOSED,CLEAN,2026-10-23
+ACC-DL-001,ACC,DL,ACC-DL-001 · A2 冷启动 — `PASS`,docs/acceptance.md:29,PROPOSED,CLEAN,2026-10-23
+ACC-DL-002,ACC,DL,ACC-DL-002 · A3 单段下载 — `PASS`,docs/acceptance.md:38,PROPOSED,CLEAN,2026-10-23
+ACC-DL-003,ACC,DL,ACC-DL-003 · A4 多线程分片 — `PASS`,docs/acceptance.md:43,PROPOSED,CLEAN,2026-10-23
+ACC-DL-004,ACC,DL,ACC-DL-004 · A5 并发写入的数据完整性 — `PASS`,docs/acceptance.md:59,PROPOSED,CLEAN,2026-10-23
+ACC-DL-005,ACC,DL,ACC-DL-005 · A6 断点续传跨进程重启 — `PASS`,docs/acceptance.md:70,PROPOSED,CLEAN,2026-10-23
+ACC-DL-006,ACC,DL,ACC-DL-006 · A7 缺了它 A6 就不成立的落库 — `PASS`,docs/acceptance.md:92,PROPOSED,CLEAN,2026-10-23
+ACC-DL-007,ACC,DL,ACC-DL-007 · A8 自动恢复 — `PASS`,docs/acceptance.md:97,PROPOSED,CLEAN,2026-10-23
+ACC-DL-008,ACC,DL,ACC-DL-008 · A9 全局限速 — `PASS`,docs/acceptance.md:103,PROPOSED,CLEAN,2026-10-23
+ACC-DL-009,ACC,DL,ACC-DL-009 · A10 完成 / 失败通知 — `PASS`,docs/acceptance.md:112,PROPOSED,CLEAN,2026-10-23
+ACC-DL-010,ACC,DL,ACC-DL-010 · A11 仅 Wi-Fi 约束 — 已实现，`TODO` 实测,docs/acceptance.md:119,PROPOSED,CLEAN,2026-10-23
+ACC-DL-011,ACC,DL,ACC-DL-011 · A12 队列并发上限 — `TODO`,docs/acceptance.md:128,PROPOSED,CLEAN,2026-10-23
+ACC-DL-012,ACC,DL,ACC-DL-012 · A13 文件被外部删除后续传 — `PASS`,docs/acceptance.md:134,PROPOSED,CLEAN,2026-10-23
+ACC-DL-013,ACC,DL,ACC-DL-013 · A14 断网 → 等待 → 自动恢复 — `PASS`,docs/acceptance.md:148,PROPOSED,CLEAN,2026-10-23
+ACC-DL-014,ACC,DL,ACC-DL-014 · A15 302 跨 host 重定向 — `PASS`,docs/acceptance.md:162,PROPOSED,CLEAN,2026-10-23
+ACC-DL-015,ACC,DL,ACC-DL-015 · A16 数据库升级不清空记录 — `PASS`（代码审阅）,docs/acceptance.md:169,PROPOSED,CLEAN,2026-10-23
+ACC-DL-016,ACC,DL,ACC-DL-016 · A17 空间不足预检 — `TODO`,docs/acceptance.md:174,PROPOSED,CLEAN,2026-10-23
+ACC-DL-017,ACC,DL,ACC-DL-017 · A18 同名任务并发去重 — `TODO`,docs/acceptance.md:180,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-001,ACC,PRV,`build.gradle.kts` 中 grep `firebase\,docs/acceptance.md:259,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-002,ACC,PRV,源码 grep `ANDROID_ID\,docs/acceptance.md:260,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-003,ACC,PRV,同上依赖检查,docs/acceptance.md:261,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-004,ACC,PRV,设置页展示的 `installId` 来自 `UUID.randomUUID()`，存 SharedPreferences,docs/acceptance.md:262,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-005,ACC,PRV,除用户输入的下载 URL 与浏览器导航外无网络调用,docs/acceptance.md:263,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-006,ACC,PRV,飞行模式下打开 app，列表/设置/历史应正常,docs/acceptance.md:264,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-007,ACC,PRV,`aapt2 dump permissions app-debug.apk` → 6 项,docs/acceptance.md:265,PROPOSED,CLEAN,2026-10-23
+ACC-PRV-008,ACC,PRV,设置 →「隐私说明」逐条列出不收集项,docs/acceptance.md:266,PROPOSED,CLEAN,2026-10-23
+CAND-DL-001,CAND,DL,候选行为规格包,crre/handoff/README.md,PROPOSED,DIRTY,2026-10-23
+CONST-BR-001,CONST,BR,单次页面扫描上限,docs/spec/constants.md:28,PROPOSED,CLEAN,2026-10-23
+CONST-BR-002,CONST,BR,媒体体积过滤,docs/spec/constants.md:29,PROPOSED,CLEAN,2026-10-23
+CONST-DL-001,CONST,DL,探测连接超时 / 读超时,docs/spec/constants.md:11,PROPOSED,CLEAN,2026-10-23
+CONST-DL-002,CONST,DL,下载连接超时 / 读超时,docs/spec/constants.md:12,PROPOSED,CLEAN,2026-10-23
+CONST-DL-003,CONST,DL,读缓冲,docs/spec/constants.md:13,PROPOSED,CLEAN,2026-10-23
+CONST-DL-004,CONST,DL,分片粒度,docs/spec/constants.md:14,PROPOSED,CLEAN,2026-10-23
+CONST-DL-005,CONST,DL,分片上限,docs/spec/constants.md:15,PROPOSED,CLEAN,2026-10-23
+CONST-DL-006,CONST,DL,不分段阈值,docs/spec/constants.md:16,PROPOSED,CLEAN,2026-10-23
+CONST-DL-007,CONST,DL,单请求重试次数,docs/spec/constants.md:17,PROPOSED,CLEAN,2026-10-23
+CONST-DL-008,CONST,DL,重试退避,docs/spec/constants.md:18,PROPOSED,CLEAN,2026-10-23
+CONST-DL-009,CONST,DL,进度流刷新,docs/spec/constants.md:19,PROPOSED,CLEAN,2026-10-23
+CONST-DL-010,CONST,DL,任务级落库,docs/spec/constants.md:20,PROPOSED,CLEAN,2026-10-23
+CONST-DL-011,CONST,DL,分片级落库,docs/spec/constants.md:21,PROPOSED,CLEAN,2026-10-23
+CONST-DL-012,CONST,DL,默认线程数,docs/spec/constants.md:22,PROPOSED,CLEAN,2026-10-23
+CONST-DL-013,CONST,DL,默认并发任务数,docs/spec/constants.md:23,PROPOSED,CLEAN,2026-10-23
+CONST-DL-014,CONST,DL,测速窗口,docs/spec/constants.md:24,PROPOSED,CLEAN,2026-10-23
+CONST-DL-015,CONST,DL,文件名长度上限,docs/spec/constants.md:25,PROPOSED,CLEAN,2026-10-23
+CONST-DL-016,CONST,DL,重名后缀上限,docs/spec/constants.md:26,PROPOSED,CLEAN,2026-10-23
+CONST-DL-017,CONST,DL,诊断日志轮转上限,docs/spec/constants.md:27,PROPOSED,CLEAN,2026-10-23
+ERR-BR-001,ERR,BR,注入脚本返回值被二次编码,docs/spec/errors.md:24,PROPOSED,CLEAN,2026-10-23
+ERR-BR-002,ERR,BR,广告规则文件缺失或加载失败,docs/spec/errors.md:25,PROPOSED,CLEAN,2026-10-23
+ERR-DL-001,ERR,DL,探测请求失败、超时或被拒绝,docs/spec/errors.md:12,PROPOSED,CLEAN,2026-10-23
+ERR-DL-002,ERR,DL,续传请求得到 `200` 而非 `206`,docs/spec/errors.md:13,PROPOSED,CLEAN,2026-10-23
+ERR-DL-003,ERR,DL,流正常结束但写入字节少于预期,docs/spec/errors.md:14,PROPOSED,CLEAN,2026-10-23
+ERR-DL-004,ERR,DL,单分片 3 次重试均失败,docs/spec/errors.md:15,PROPOSED,CLEAN,2026-10-23
+ERR-DL-005,ERR,DL,`ETag`/`Last-Modified`/大小基线变化,docs/spec/errors.md:16,PROPOSED,CLEAN,2026-10-23
+ERR-DL-006,ERR,DL,任务文件被外部删除或截断,docs/spec/errors.md:17,PROPOSED,CLEAN,2026-10-23
+ERR-DL-007,ERR,DL,目标磁盘空间不足,docs/spec/errors.md:18,PROPOSED,CLEAN,2026-10-23
+ERR-DL-008,ERR,DL,导出到公共目录失败,docs/spec/errors.md:19,PROPOSED,CLEAN,2026-10-23
+ERR-DL-009,ERR,DL,通知权限未授予,docs/spec/errors.md:20,PROPOSED,CLEAN,2026-10-23
+ERR-DL-010,ERR,DL,网络断开或从 Wi-Fi 切到蜂窝,docs/spec/errors.md:21,PROPOSED,CLEAN,2026-10-23
+ERR-DL-011,ERR,DL,删除正在运行的任务,docs/spec/errors.md:22,PROPOSED,CLEAN,2026-10-23
+ERR-DL-012,ERR,DL,数据库中的状态值无法反序列化,docs/spec/errors.md:23,PROPOSED,CLEAN,2026-10-23
+ERR-SH-001,ERR,SH,分享内容没有可解析的 http(s) URL,docs/spec/errors.md:26,PROPOSED,CLEAN,2026-10-23
+EV-G0-001,EV,CRRE,baseline audit report,crre/registry/evidence.csv:11,RECORDED,ROLE-AUDIT,2026-10-23
+EV-G1-001,EV,CRRE,target 1DM+ 18.2,crre/registry/evidence.csv:2,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-002,EV,CRRE,"analysis variant, lab-signed",crre/registry/evidence.csv:3,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-003,EV,CRRE,"analysis variant, unsigned",crre/registry/evidence.csv:4,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-004,EV,CRRE,tree: 5720 files; decompiled sources + endpoint scans,crre/registry/evidence.csv:5,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-005,EV,CRRE,main privacy report,crre/registry/evidence.csv:6,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-006,EV,CRRE,frida dynamic evidence,crre/registry/evidence.csv:7,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-007,EV,CRRE,tree: 5 files; hook scripts + frida-server,crre/registry/evidence.csv:8,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-008,EV,CRRE,tree: 6 files; reproduction scripts,crre/registry/evidence.csv:9,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G1-009,EV,CRRE,tree: 8 files; post-remediation specs snapshot,crre/registry/evidence.csv:10,RECORDED,ROLE-DIRTY,2026-10-23
+EV-G4-001,EV,CRRE,"tree: 6 files; normative spec baseline, legal NOT_REVIEWED",crre/registry/evidence.csv:12,RECORDED,ROLE-CLEAN,2026-10-23
+EV-G4-002,EV,CRRE,tree: 50 files; implementation source snapshot,crre/registry/evidence.csv:13,RECORDED,ROLE-CLEAN,2026-10-23
+EV-G4-003,EV,CRRE,tree: 15 files; governance package snapshot,crre/registry/evidence.csv:14,RECORDED,ROLE-AUDIT,2026-10-23
+GAP-001,GAP,CRRE,全部规格未经法律审查,crre/gaps/GAP-REGISTER.md:14,BLOCKED,AUDIT,2026-10-23
+GAP-002,GAP,CRRE,现有实现早于批准规格,crre/gaps/GAP-REGISTER.md:15,BLOCKED,AUDIT,2026-10-23
+GAP-003,GAP,CRRE,D1 原始分析含受保护表达,crre/gaps/GAP-REGISTER.md:16,TRIAGED,AUDIT,2026-10-23
+GAP-004,GAP,CRRE,历史文档未全量 ID 化,crre/gaps/GAP-REGISTER.md:25,OPEN,AUDIT,2026-10-23
+GAP-005,GAP,CRRE,描述性文档仍含规范措辞,crre/gaps/GAP-REGISTER.md:26,OPEN,AUDIT,2026-10-23
+GAP-006,GAP,CRRE,分段进度条几何与候选规格逐条对应,crre/gaps/GAP-REGISTER.md:17,BLOCKED,AUDIT,2026-10-23
+GAP-007,GAP,CRRE,文件类型表来源标注“原始数据，可直接复用”,crre/gaps/GAP-REGISTER.md:18,BLOCKED,AUDIT,2026-10-23
+GAP-008,GAP,CRRE,无独立验证记录,crre/gaps/GAP-REGISTER.md:37,BLOCKED,AUDIT,2026-10-23
+GAP-009,GAP,CRRE,无需求→代码追溯矩阵,crre/gaps/GAP-REGISTER.md:27,OPEN,AUDIT,2026-10-23
+GAP-010,GAP,CRRE,环境隔离不清,crre/gaps/GAP-REGISTER.md:38,TRIAGED,AUDIT,2026-10-23
+GAP-011,GAP,CRRE,候选规格 §7 六态与 §1.1 五态冲突,crre/gaps/GAP-REGISTER.md:28,RESOLVED,AUDIT,2026-10-23
+GAP-012,GAP,CRRE,HLS/DASH 只作单文件下载，无分片合并,crre/gaps/GAP-REGISTER.md:49,DEFERRED,AUDIT,2026-10-23
+GAP-013,GAP,CRRE,广告过滤不处理内联广告位,crre/gaps/GAP-REGISTER.md:50,DEFERRED,AUDIT,2026-10-23
+GAP-014,GAP,CRRE,列表长按多选、添加下载改保存位置未实现,crre/gaps/GAP-REGISTER.md:51,DEFERRED,AUDIT,2026-10-23
+GAP-015,GAP,CRRE,P6 飞行模式可用未实测,crre/gaps/GAP-REGISTER.md:39,OPEN,AUDIT,2026-10-23
+GAP-016,GAP,CRRE,`ui-design.md` 早期“广告拦截不做”与实现不一致,crre/gaps/GAP-REGISTER.md:29,OPEN,AUDIT,2026-10-23
+GAP-017,GAP,CRRE,仅 Wi-Fi / 并发上限未实测,crre/gaps/GAP-REGISTER.md:40,OPEN,AUDIT,2026-10-23
+GAP-018,GAP,CRRE,空间不足预检 / 同名并发去重仅代码审阅,crre/gaps/GAP-REGISTER.md:41,OPEN,AUDIT,2026-10-23
+GAP-019,GAP,CRRE,release 签名与 `proguard` 规则未实测,crre/gaps/GAP-REGISTER.md:52,DEFERRED,AUDIT,2026-10-23
+GAP-020,GAP,CRRE,`logic-spec §15–§18` 与逆向笔记存在可追溯关系,crre/gaps/GAP-REGISTER.md:19,BLOCKED,AUDIT,2026-10-23
+GAP-021,GAP,CRRE,验收环境使用 `1DMPlus` AVD 名称,crre/gaps/GAP-REGISTER.md:42,TRIAGED,AUDIT,2026-10-23
+GAP-022,GAP,CRRE,`ui-design.md` 交叉引用第 17 部分错误,crre/gaps/GAP-REGISTER.md:30,RESOLVED,AUDIT,2026-10-23
+GAP-023,GAP,CRRE,证据清单/哈希缺失,crre/gaps/GAP-REGISTER.md:43,OPEN,AUDIT,2026-10-23
+GAP-024,GAP,CRRE,候选规格章节→REQ 映射未落到条款级,crre/gaps/GAP-REGISTER.md:31,OPEN,AUDIT,2026-10-23
+GAP-025,GAP,CRRE,`logic-spec §14.4` 自述存在重复格式化实现,crre/gaps/GAP-REGISTER.md:53,OPEN,AUDIT,2026-10-23
+INC-001,INC,CRRE,Dirty 规格引用 Clean 文档并含实现状态,crre/audit/findings.csv:2,RESOLVED,DIRTY,2026-10-23
+INC-002,INC,CRRE,原始表达进入候选规格,crre/audit/findings.csv:3,OPEN,DIRTY,2026-10-23
+INC-003,INC,CRRE,实现端 UI 设计文档误存 Dirty 区,crre/audit/findings.csv:4,RESOLVED,DIRTY,2026-10-23
+INC-004,INC,CRRE,Clean 设计文档与逆向笔记逐条对应,crre/audit/findings.csv:5,BLOCKED,CLEAN/COUNSEL,2026-10-23
+INC-005,INC,CRRE,法律审查从未执行,crre/audit/findings.csv:6,BLOCKED,OWNER,2026-10-23
+INC-006,INC,CRRE,稳定 ID 缺失,crre/audit/findings.csv:7,RESOLVED,CLEAN,2026-10-23
+INC-007,INC,CRRE,规定性与描述性混装,crre/audit/findings.csv:8,OPEN,CLEAN,2026-10-23
+INC-008,INC,CRRE,验证独立性缺失,crre/audit/findings.csv:9,BLOCKED,AUDIT,2026-10-23
+INC-009,INC,CRRE,缺口管理缺失,crre/audit/findings.csv:10,RESOLVED,AUDIT,2026-10-23
+INC-010,INC,CRRE,证据保管链缺失,crre/audit/findings.csv:11,OPEN,AUDIT,2026-10-23
+INC-011,INC,CRRE,环境隔离不清,crre/audit/findings.csv:12,OPEN,AUDIT,2026-10-23
+INC-012,INC,CRRE,Clean 实测数字进入候选规格,crre/audit/findings.csv:13,RESOLVED,DIRTY,2026-10-23
+INV-DL-001,INV,DL,任务级已下载总量 ≥ 所有分片已写字节之和；最多允许一个进度刷新周期的超前。,docs/spec/invariants.md:11,PROPOSED,CLEAN,2026-10-23
+INV-DL-002,INV,DL,续传只读取分片级已写字节，从不把任务级累计值作为锚点。,docs/spec/invariants.md:12,PROPOSED,CLEAN,2026-10-23
+INV-DL-003,INV,DL,所有分片已写字节之和 ≤ 总大小（总大小已知时）。,docs/spec/invariants.md:13,PROPOSED,CLEAN,2026-10-23
+INV-DL-004,INV,DL,"一个任务的所有分片区间恰好覆盖 `[0, total-1]`，无重叠、无空洞；大小未知时只有 1 个哨兵分片。",docs/spec/invariants.md:14,PROPOSED,CLEAN,2026-10-23
+LEG-001,LEG,CRRE,法律审查记录（待签发）,crre/reviews/TEMPLATE-LEGAL.md,OPEN,COUNSEL,2026-10-23
+PRV-001,PRV,001,不得集成任何分析、统计、崩溃上报或归因 SDK；依赖清单中不得出现 firebase、crashlytics、umeng、bugly、adjust、installreferrer 等。,docs/spec/privacy.md:11,PROPOSED,CLEAN,2026-10-23
+PRV-002,PRV,002,不得读取 `ANDROID_ID`、IMEI、MEID、序列号、MAC、SIM/运营商信息。,docs/spec/privacy.md:12,PROPOSED,CLEAN,2026-10-23
+PRV-003,PRV,003,不得使用安装来源归因（InstallReferrer）。,docs/spec/privacy.md:13,PROPOSED,CLEAN,2026-10-23
+PRV-004,PRV,004,应用内唯一标识必须是启动时生成的随机 UUID，仅存本地，且与任何设备属性无关。,docs/spec/privacy.md:14,PROPOSED,CLEAN,2026-10-23
+PRV-005,PRV,005,除用户输入的 URL、内置浏览器导航与用户发起的下载外，不得产生任何出网请求。,docs/spec/privacy.md:15,PROPOSED,CLEAN,2026-10-23
+PRV-006,PRV,006,断网时，除下载外的功能（列表、设置、历史、主题、隐私说明）必须可用。,docs/spec/privacy.md:16,PROPOSED,CLEAN,2026-10-23
+PRV-007,PRV,007,权限清单必须最小化，目标为 6 项：`INTERNET`、`ACCESS_NETWORK_STATE`、`FOREGROUND_SERVICE`、`FOREGROUND_SERVICE_DATA_SYNC`、`POST_NOTIFICATIONS`、`WAKE_LOCK`；Android ≤9 可追加 `WRITE_EXTERNAL_STORAGE`。,docs/spec/privacy.md:17,PROPOSED,CLEAN,2026-10-23
+PRV-008,PRV,008,必须提供“隐私说明”页，逐条列出不收集的项目，并与实际行为一致。,docs/spec/privacy.md:18,PROPOSED,CLEAN,2026-10-23
+PRV-009,PRV,009,诊断日志只写本地，不含设备标识、完整 URL 查询参数或用户内容；可关闭、可清空。,docs/spec/privacy.md:19,PROPOSED,CLEAN,2026-10-23
+PRV-010,PRV,010,广告过滤规则随包分发，不得联网订阅；用户导入规则只存本地。,docs/spec/privacy.md:20,PROPOSED,CLEAN,2026-10-23
+REQ-BR-001,REQ,BR,页面加载完成后必须扫描 `video`/`audio` 元素及其 `source` 子节点，以及指向常见媒体扩展名的链接。,docs/spec/requirements.md:97,PROPOSED,CLEAN,2026-10-23
+REQ-BR-002,REQ,BR,必须拦截响应，依据 MIME 或 URL 后缀识别媒体资源。,docs/spec/requirements.md:98,PROPOSED,CLEAN,2026-10-23
+REQ-BR-003,REQ,BR,同一媒体被页面扫描与网络拦截同时命中时，必须合并为一条，并标注来源。,docs/spec/requirements.md:99,PROPOSED,CLEAN,2026-10-23
+REQ-BR-004,REQ,BR,去重键必须是规范化 URL：去除片段、对查询参数排序。,docs/spec/requirements.md:100,PROPOSED,CLEAN,2026-10-23
+REQ-BR-005,REQ,BR,HLS/DASH 清单本版本只作为普通文件下载，不得声称已完成分片合并。,docs/spec/requirements.md:101,PROPOSED,CLEAN,2026-10-23
+REQ-BR-006,REQ,BR,注入的嗅探脚本必须随安装包固定，不得联网下发，不得包含上报回调。,docs/spec/requirements.md:102,PROPOSED,CLEAN,2026-10-23
+REQ-BR-007,REQ,BR,每个标签必须有独立历史栈；后退/前进不得跨标签串历史。,docs/spec/requirements.md:103,PROPOSED,CLEAN,2026-10-23
+REQ-BR-008,REQ,BR,浏览历史必须独立成页，支持删除单条与清空。,docs/spec/requirements.md:104,PROPOSED,CLEAN,2026-10-23
+REQ-BR-009,REQ,BR,外部链接默认交给系统浏览器打开网页；只有可识别为文件或 WebView 无法渲染时才进入下载。,docs/spec/requirements.md:105,PROPOSED,CLEAN,2026-10-23
+REQ-BR-010,REQ,BR,广告过滤规则必须随安装包分发，不得联网订阅或自动更新。,docs/spec/requirements.md:106,PROPOSED,CLEAN,2026-10-23
+REQ-BR-011,REQ,BR,广告过滤只按主机名匹配并支持父域回退；页面主文档不得被拦截。,docs/spec/requirements.md:107,PROPOSED,CLEAN,2026-10-23
+REQ-BR-012,REQ,BR,用户导入规则只接受纯主机名、hosts 行与注释；路径、正则、Adblock 语法必须拒绝。,docs/spec/requirements.md:108,PROPOSED,CLEAN,2026-10-23
+REQ-DL-001,REQ,DL,任务状态只能取 `QUEUED`、`RUNNING`、`PAUSED`、`COMPLETED`、`FAILED` 五值；不得引入 `CANCELED` 中间态。,docs/spec/requirements.md:18,PROPOSED,CLEAN,2026-10-23
+REQ-DL-002,REQ,DL,删除任务时直接删除任务记录及其分片记录；删除动作不得以“取消”状态残留。,docs/spec/requirements.md:19,PROPOSED,CLEAN,2026-10-23
+REQ-DL-003,REQ,DL,一个任务由一条任务记录和 N 条分片记录组成；N ≥ 1。,docs/spec/requirements.md:20,PROPOSED,CLEAN,2026-10-23
+REQ-DL-004,REQ,DL,任务进入 `RUNNING` 前必须已持久化任务与分片计划。,docs/spec/requirements.md:21,PROPOSED,CLEAN,2026-10-23
+REQ-DL-005,REQ,DL,`COMPLETED` 仅在所有分片完成且大小校验通过后写入。,docs/spec/requirements.md:22,PROPOSED,CLEAN,2026-10-23
+REQ-DL-006,REQ,DL,重启时 `RUNNING` 任务必须转为 `QUEUED` 并允许自动恢复；`PAUSED` 任务必须保持暂停。,docs/spec/requirements.md:23,PROPOSED,CLEAN,2026-10-23
+REQ-DL-007,REQ,DL,探测必须先发 `HEAD`；若被拒绝、超时或方法不支持，回退为 `GET` + `Range: bytes=0-0`。,docs/spec/requirements.md:29,PROPOSED,CLEAN,2026-10-23
+REQ-DL-008,REQ,DL,仅当响应表明支持字节范围且总大小已知时，任务才可标记为可分段。,docs/spec/requirements.md:30,PROPOSED,CLEAN,2026-10-23
+REQ-DL-009,REQ,DL,必须记录 `ETag`（优先）、`Last-Modified`、`Content-Length` 作为续传校验基线。,docs/spec/requirements.md:31,PROPOSED,CLEAN,2026-10-23
+REQ-DL-010,REQ,DL,续传或恢复前必须复核基线；任一基线变化时不得复用已下载分片。,docs/spec/requirements.md:32,PROPOSED,CLEAN,2026-10-23
+REQ-DL-011,REQ,DL,探测失败不得阻止创建任务；任务以未知大小进入队列，并在下载阶段重新探测。,docs/spec/requirements.md:33,PROPOSED,CLEAN,2026-10-23
+REQ-DL-012,REQ,DL,默认每任务线程数为 8，允许用户设置 1–16。,docs/spec/requirements.md:39,PROPOSED,CLEAN,2026-10-23
+REQ-DL-013,REQ,DL,默认分片粒度为 8 MiB，单任务分片数上限为 64。,docs/spec/requirements.md:40,PROPOSED,CLEAN,2026-10-23
+REQ-DL-014,REQ,DL,当文件大小未知或小于 2 个粒度时，只使用 1 个分片。,docs/spec/requirements.md:41,PROPOSED,CLEAN,2026-10-23
+REQ-DL-015,REQ,DL,"段数按 `min(线程数, 64, floor(size/粒度))` 计算；段长按 `ceil(size/段数)` 计算，最后一段截断到总大小。",docs/spec/requirements.md:42,PROPOSED,CLEAN,2026-10-23
+REQ-DL-016,REQ,DL,每个分片请求必须携带独立的 `Range`；分片区间必须首尾相接、无重叠、无空洞，并覆盖整个文件。,docs/spec/requirements.md:43,PROPOSED,CLEAN,2026-10-23
+REQ-DL-017,REQ,DL,大小已知时，文件必须在首字节写入前预分配到最终大小。,docs/spec/requirements.md:44,PROPOSED,CLEAN,2026-10-23
+REQ-DL-018,REQ,DL,多分片写入同一文件时，定位与写入必须作为一个互斥临界区执行。,docs/spec/requirements.md:45,PROPOSED,CLEAN,2026-10-23
+REQ-DL-019,REQ,DL,大小未知时不得预分配，不得发送 `Range`，并使用明确的哨兵值表示未知结束位置。,docs/spec/requirements.md:46,PROPOSED,CLEAN,2026-10-23
+REQ-DL-020,REQ,DL,每个分片必须维护独立的已写入字节计数，并作为重试与续传的唯一锚点。,docs/spec/requirements.md:52,PROPOSED,CLEAN,2026-10-23
+REQ-DL-021,REQ,DL,分片进度落库必须满足“距上次落库 ≥1 秒或累计新增 ≥1 MiB，取先到者”。,docs/spec/requirements.md:53,PROPOSED,CLEAN,2026-10-23
+REQ-DL-022,REQ,DL,续传请求必须要求服务器返回 `206`；若服务器以 `200` 响应且请求起点非段首，必须视为错误，不得写入。,docs/spec/requirements.md:54,PROPOSED,CLEAN,2026-10-23
+REQ-DL-023,REQ,DL,流正常结束但写入字节不足时，必须视为失败并进入重试。,docs/spec/requirements.md:55,PROPOSED,CLEAN,2026-10-23
+REQ-DL-024,REQ,DL,单请求最多重试 3 次，退避为 1、2、4 秒；重试必须从当前锚点继续，不得回到段首。,docs/spec/requirements.md:56,PROPOSED,CLEAN,2026-10-23
+REQ-DL-025,REQ,DL,续传只读取分片级已写字节，不得以任务级累计值作为续传锚点。,docs/spec/requirements.md:57,PROPOSED,CLEAN,2026-10-23
+REQ-DL-026,REQ,DL,全局最大并发任务数默认 3，允许 1–8。,docs/spec/requirements.md:63,PROPOSED,CLEAN,2026-10-23
+REQ-DL-027,REQ,DL,排队顺序按创建时间先进先出；本版本不提供手动排序。,docs/spec/requirements.md:64,PROPOSED,CLEAN,2026-10-23
+REQ-DL-028,REQ,DL,任务进入终态后必须立即补位，保持并发数被填满。,docs/spec/requirements.md:65,PROPOSED,CLEAN,2026-10-23
+REQ-DL-029,REQ,DL,启用“仅 Wi-Fi”且当前非 Wi-Fi 时，任务转 `PAUSED` 并写入明确的等待网络标记。,docs/spec/requirements.md:66,PROPOSED,CLEAN,2026-10-23
+REQ-DL-030,REQ,DL,网络恢复时只自动恢复带等待网络标记的任务；用户手动暂停的任务不得被自动拉起。,docs/spec/requirements.md:67,PROPOSED,CLEAN,2026-10-23
+REQ-DL-031,REQ,DL,全局限速必须由所有任务的所有分片共享一个令牌桶；桶容量不超过 1 秒的量；值为 0 表示关闭。,docs/spec/requirements.md:68,PROPOSED,CLEAN,2026-10-23
+REQ-DL-032,REQ,DL,单任务内部线程池必须独立；任务暂停时必须释放其线程。,docs/spec/requirements.md:69,PROPOSED,CLEAN,2026-10-23
+REQ-DL-033,REQ,DL,文件名推导顺序必须是：`Content-Disposition` 的 RFC 5987 文件名、普通 `filename`、MIME 扩展名 + URL 末段、URL 路径末段、带时间戳的兜底名。,docs/spec/requirements.md:75,PROPOSED,CLEAN,2026-10-23
+REQ-DL-034,REQ,DL,文件名必须移除路径分隔符、控制字符与平台非法字符，并去除首尾的点与空白；空名回退为 `download`。,docs/spec/requirements.md:76,PROPOSED,CLEAN,2026-10-23
+REQ-DL-035,REQ,DL,文件名超过 120 字符时，必须截断主名并保留扩展名。,docs/spec/requirements.md:77,PROPOSED,CLEAN,2026-10-23
+REQ-DL-036,REQ,DL,重名时依次追加 ` (1)`…` (999)`；仍冲突时使用 `-n` 后缀。,docs/spec/requirements.md:78,PROPOSED,CLEAN,2026-10-23
+REQ-DL-037,REQ,DL,默认保存到应用私有目录；用户可选择导出到系统公共下载目录。,docs/spec/requirements.md:79,PROPOSED,CLEAN,2026-10-23
+REQ-DL-038,REQ,DL,公共目录导出必须使用系统媒体库或等价的受支持写入方式；导出失败时保留私有副本。,docs/spec/requirements.md:80,PROPOSED,CLEAN,2026-10-23
+REQ-DL-039,REQ,DL,完成时必须校验实际大小与已知 `Content-Length` 一致；不一致标记失败。,docs/spec/requirements.md:86,PROPOSED,CLEAN,2026-10-23
+REQ-DL-040,REQ,DL,不得在下载完成后自动安装 APK。,docs/spec/requirements.md:87,PROPOSED,CLEAN,2026-10-23
+REQ-DL-041,REQ,DL,总进度必须按所有分片已写字节之和除以总大小计算；大小未知时不得显示虚假百分比。,docs/spec/requirements.md:88,PROPOSED,CLEAN,2026-10-23
+REQ-DL-042,REQ,DL,速度必须使用滚动窗口计算；窗口默认 3 秒。,docs/spec/requirements.md:89,PROPOSED,CLEAN,2026-10-23
+REQ-DL-043,REQ,DL,剩余时间必须由剩余字节与平滑速度计算；速度无效时不得显示。,docs/spec/requirements.md:90,PROPOSED,CLEAN,2026-10-23
+REQ-DL-044,REQ,DL,前台通知必须包含进度、百分比、速度与暂停/取消动作；全部任务完成时必须发出汇总通知。,docs/spec/requirements.md:91,PROPOSED,CLEAN,2026-10-23
+REQ-DL-045,REQ,DL,每个实现变更必须能追溯到至少一个 `REQ-*`/`INV-*`/`ERR-*`；无追溯的变更不得合并。,docs/spec/requirements.md:151,PROPOSED,CLEAN,2026-10-23
+REQ-DL-046,REQ,DL,任何与规格不一致的行为必须登记为 `GAP-*`，并按 `id-policy.md §4` 的状态机处置。,docs/spec/requirements.md:152,PROPOSED,CLEAN,2026-10-23
+REQ-DL-047,REQ,DL,规格条款的 ID 永不复用；语义变化必须新建 ID 并退役旧 ID。,docs/spec/requirements.md:153,PROPOSED,CLEAN,2026-10-23
+REQ-SH-001,REQ,SH,接收文本分享时，提取第一个 http(s) URL 并预填新建下载。,docs/spec/requirements.md:114,PROPOSED,CLEAN,2026-10-23
+REQ-SH-002,REQ,SH,接收 http/https 的 `ACTION_VIEW` 时，按同一规则处理。,docs/spec/requirements.md:115,PROPOSED,CLEAN,2026-10-23
+REQ-SH-003,REQ,SH,二进制分享内容必须忽略并明确提示。,docs/spec/requirements.md:116,PROPOSED,CLEAN,2026-10-23
+REQ-SH-004,REQ,SH,剪贴板识别默认关闭；开启后只在应用处于前台时监听，且不保存原文。,docs/spec/requirements.md:117,PROPOSED,CLEAN,2026-10-23
+REQ-SH-005,REQ,SH,诊断日志必须只写本地，轮转上限约 1 MiB，不含设备标识或 URL 查询参数，可关闭、可清空。,docs/spec/requirements.md:118,PROPOSED,CLEAN,2026-10-23
+REQ-ST-001,REQ,ST,数据库必须至少包含任务表与分片表；任务表字段覆盖 URL、最终 URL、文件名、目录、总大小、已下载、状态、校验基线、MIME、是否分段、线程数、仅 Wi-Fi、错误、创建/更新时间。,docs/spec/requirements.md:124,PROPOSED,CLEAN,2026-10-23
+REQ-ST-002,REQ,ST,分片表字段必须覆盖任务外键、段序号、起止字节、已下载、状态；删除任务时级联删除分片。,docs/spec/requirements.md:125,PROPOSED,CLEAN,2026-10-23
+REQ-ST-003,REQ,ST,数据库升级不得通过删除表来“迁移”；必须保留既有任务记录。,docs/spec/requirements.md:126,PROPOSED,CLEAN,2026-10-23
+REQ-ST-004,REQ,ST,所有数据库访问必须经统一入口并串行化，避免并发连接写坏数据。,docs/spec/requirements.md:127,PROPOSED,CLEAN,2026-10-23
+REQ-ST-005,REQ,ST,任务文件被外部删除后，续传必须检测并重置锚点，不得向缺失文件写入。,docs/spec/requirements.md:128,PROPOSED,CLEAN,2026-10-23
+REQ-ST-006,REQ,ST,本机标识必须是随机生成并仅存本地的值，不得由设备属性推导。,docs/spec/requirements.md:129,PROPOSED,CLEAN,2026-10-23
+REQ-UI-001,REQ,UI,主界面必须使用单 Activity 与底部导航，至少包含下载、浏览、已完成、设置四个入口。,docs/spec/requirements.md:135,PROPOSED,CLEAN,2026-10-23
+REQ-UI-002,REQ,UI,下载列表必须提供全部/进行中/已完成/错误四类筛选，并用分段进度铺满行背景。,docs/spec/requirements.md:136,PROPOSED,CLEAN,2026-10-23
+REQ-UI-003,REQ,UI,新建下载必须提供 URL、文件名、线程数、仅 Wi-Fi 字段，并在 URL 非 http(s) 时禁止提交。,docs/spec/requirements.md:137,PROPOSED,CLEAN,2026-10-23
+REQ-UI-004,REQ,UI,任务详情必须显示 URL、最终 URL、保存路径、大小、已下载、分片状态与错误；动作至少包含暂停/继续、重试、删除。,docs/spec/requirements.md:138,PROPOSED,CLEAN,2026-10-23
+REQ-UI-005,REQ,UI,起始页必须提供快捷方式卡片堆，并能展开为单列信息流；返回卡片堆必须有明确手势。,docs/spec/requirements.md:139,PROPOSED,CLEAN,2026-10-23
+REQ-UI-006,REQ,UI,浏览器工具栏必须提供后退、前进、刷新、主页、地址输入与媒体检测入口。,docs/spec/requirements.md:140,PROPOSED,CLEAN,2026-10-23
+REQ-UI-007,REQ,UI,媒体检测结果必须支持多选、全选/取消全选、合计大小与批量下载。,docs/spec/requirements.md:141,PROPOSED,CLEAN,2026-10-23
+REQ-UI-008,REQ,UI,已完成任务点击行必须能打开文件；菜单必须提供详情、重新下载、删除。,docs/spec/requirements.md:142,PROPOSED,CLEAN,2026-10-23
+REQ-UI-009,REQ,UI,空态、加载态、错误态必须有明确文案，不得只显示空白。,docs/spec/requirements.md:143,PROPOSED,CLEAN,2026-10-23
+REQ-UI-010,REQ,UI,主题必须支持浅色/深色与动态取色；未实现的能力不得以死开关展示。,docs/spec/requirements.md:144,PROPOSED,CLEAN,2026-10-23
+REQ-UI-011,REQ,UI,设置页必须提供下载参数、外观、隐私说明与诊断日志开关。,docs/spec/requirements.md:145,PROPOSED,CLEAN,2026-10-23
+REV-001,REV,CRRE,独立验证记录（待签发）,crre/reviews/TEMPLATE-VERIFICATION.md,OPEN,AUDIT,2026-10-23

@@ -4,6 +4,13 @@
 
 > 净室实现：代码全部原创，未复用任何反编译产物。行为规格来自对 1DM+ 18.2 的
 > 黑盒观察与静态分析结论，逆向证据不随仓库分发。
+>
+> **合规状态（2026-10-23）**：法律审查 `NOT_REVIEWED`，独立验证未执行；当前版本
+> **不得对外发布**。治理入口 [`crre/README.md`](crre/README.md)，缺口见
+> [`crre/gaps/GAP-REGISTER.md`](crre/gaps/GAP-REGISTER.md)。
+>
+> **规范来源**：[`docs/spec/`](docs/spec/) 是唯一权威；`docs/logic-spec.md` 等为
+> INFORMATIVE 设计说明。所有需求/不变量/错误/验收使用稳定 `REQ-*`/`INV-*`/`ERR-*`/`ACC-*` ID。
 
 ## 相对 1DM+ 的差异
 
@@ -69,15 +76,21 @@ app/src/main/java/app/freedm/
       BrowserBus.kt                 历史页 → 浏览页的单发通道
 tools/    range_server.py（Range 测试源）· parse_dump.py（UI 自动化取坐标）
           check_doc_coverage.py（机械核对代码常量是否都写进了文档）
-docs/     README.md（文档导读：按什么顺序读）
-          logic-spec.md（逐函数伪代码，13 部分，可逐行对照实现）
-          implementation-guide.md（状态机 / 调用序列 / 线程模型 / 常量表）
-          acceptance.md（验收清单，带可执行判定）
-          known-pitfalls.md（16 条真实踩坑）
+docs/     README.md（文档导读：先规范、后设计）
+          spec/（规范性：requirements / invariants / errors / privacy / constants）
+          logic-spec.md（INFORMATIVE 设计：逐函数说明与伪代码）
+          implementation-guide.md（INFORMATIVE：状态机 / 调用序列 / 线程模型 / 常量解释）
+          acceptance.md（规范性验收：ACC-*，带可执行判定）
+          known-pitfalls.md（INFORMATIVE：真实踩坑）
+          ui-design.md（INFORMATIVE：界面设计）
           evidence-resume-server.log（续传实测的服务器原始日志）
+crre/     CRRE 治理：角色、信息流、门禁、证据、缺口、ID 注册表、审查模板
 ```
 
-## 已验证（实测，非推断）
+## 实现者自测（非独立验证）
+
+> 以下结果由实现者执行，**不能替代 G5 独立验证**。独立评审者必须不是作者、且未阅读实现
+> 文档或源码；当前 `REV-001` 尚未签发。详见 `docs/acceptance.md` 与 `crre/gates.md`。
 
 测试源用 `tools/range_server.py`（本机 Range 服务器，记录每个请求），文件 50 MiB。
 

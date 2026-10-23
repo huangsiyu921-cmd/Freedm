@@ -1,66 +1,46 @@
 # 文档导读
 
-想照着资料重建一个等价的下载器，**按这个顺序读**：
+> 先分清两类文档：**规范（NORMATIVE）**说“必须怎样”，**设计（INFORMATIVE）**解释“为什么/怎么做”。
+> 冲突时以规范为准，并登记 `GAP-*`。
+
+## 1. 规范与验收（权威）
 
 | 顺序 | 文档 | 回答什么问题 |
 |---|---|---|
-| 1 | [`logic-spec.md`](logic-spec.md) | **要实现什么 + 逐函数伪代码**：19 个部分，每个分支、每个边界写死，可逐行对照实现 |
-| 2 | [`implementation-guide.md`](implementation-guide.md) | 代码**怎么接起来**：状态机迁移表、每个动作的完整调用序列、线程模型、常量 |
-| 3 | [`known-pitfalls.md`](known-pitfalls.md) | 写代码**前**扫一遍：16 个会静默出错的坑 |
-| 4 | [`acceptance.md`](acceptance.md) | **怎么验收**：每条都有可执行命令和判定标准 |
+| 1 | [`spec/requirements.md`](spec/requirements.md) | **必须实现什么**：下载、浏览器、分享、存储、UI 的可验证条款（`REQ-*`） |
+| 2 | [`spec/invariants.md`](spec/invariants.md) | **什么绝对不能违反**（`INV-*`） |
+| 3 | [`spec/errors.md`](spec/errors.md) | **失败时怎么办**（`ERR-*`） |
+| 4 | [`spec/privacy.md`](spec/privacy.md) | **发布硬门槛**（`PRV-*`） |
+| 5 | [`spec/constants.md`](spec/constants.md) | 影响可观察行为的数值（`CONST-*`） |
+| 6 | [`acceptance.md`](acceptance.md) | **怎么证明做对了**（`ACC-*`） |
 
-> 想直接写代码 → 读 1 和 2。
-> 想少踩坑 → 读 3。
-> 想确认做完了 → 读 4。
+> 当前法律状态：`NOT_REVIEWED`。这些是整改基线，不是已批准规格。
 
-## `logic-spec.md` 覆盖了什么
+## 2. 设计说明（解释性）
 
-| 部分 | 内容 |
+| 文档 | 内容 | 备注 |
+|---|---|---|
+| [`logic-spec.md`](logic-spec.md) | 逐函数设计、伪代码、边界、时序 | `INFORMATIVE`；§15–§18 待法律审查 |
+| [`implementation-guide.md`](implementation-guide.md) | 状态机迁移、调用序列、线程模型、常量解释 | `INFORMATIVE` |
+| [`ui-design.md`](ui-design.md) | 界面信息架构与交互设计 | `INFORMATIVE`；曾是逆向端误存文档，已移回 |
+| [`known-pitfalls.md`](known-pitfalls.md) | 真实踩过的坑与设计权衡 | `INFORMATIVE` |
+| [`README.md`](README.md) | 本导读 | `INFORMATIVE` |
+
+## 3. 治理与流程
+
+| 文档 | 内容 |
 |---|---|
-| 0 | 协程/线程拓扑、三条并发铁律、四个不变量 |
-| 1 | 数据结构逐字段（谁写、约束、是否可空、哨兵值） |
-| 2 | 持久层 10 个函数，含 DDL 与分片算法的逐分支伪代码 |
-| 3 | 探测与文件名推导（含 RFC 5987 解析、清洗、去重） |
-| 4 | **下载引擎**：`start`/`pump`/`pause`/`runTask`（10 步）/`fetchSegment`（完整重试状态机） |
-| 5 | 令牌桶限速 |
-| 6 | 通知渠道与服务生命周期 |
-| 7 | 网络监听（Wi-Fi 恢复只唤醒带标记的任务） |
-| 8 | 导出到公共目录 |
-| 9 | 嗅探脚本逐行解释 + 返回值二次编码的坑 |
-| 10 | 剪贴板监听 |
-| 11 | **UI 每个按钮 → 完整调用序列** |
-| 12 | 边界条件总表（22 条） |
-| 13 | 四张时序图：全新下载、崩溃续传、暂停恢复、Wi-Fi 约束 |
+| [`../crre/README.md`](../crre/README.md) | CRRE 治理入口、权威顺序、当前门禁状态 |
+| [`../crre/roles.md`](../crre/roles.md) | 角色、访问边界、RACI |
+| [`../crre/information-flow.md`](../crre/information-flow.md) | 单向信息流、交接区、污染处置 |
+| [`../crre/gates.md`](../crre/gates.md) | G0–G6 准入/准出 |
+| [`../crre/evidence.md`](../crre/evidence.md) | 证据留存与保管链 |
+| [`../crre/gaps/GAP-REGISTER.md`](../crre/gaps/GAP-REGISTER.md) | 规格-实现缺口总账 |
+| [`../crre/reviews/`](../crre/reviews/) | 独立验证与法律审查模板 |
 
-## 三个最容易写错的地方（先看这三条再动手）
+## 4. 想快速做事
 
-1. **`fetchSegment` 的 `from` 必须用当前锚点**，不能用入参快照——否则重试从段首重下，流量翻倍、进度超 100%。
-2. **续传请求必须要求 206**。服务器返回 200 时若照样写，整包体落到非零偏移，**文件静默损坏**且大小校验能通过。
-3. **`RUNNING` 与 `PAUSED` 必须区分**。崩溃前在跑的记 `RUNNING`（启动时转 `QUEUED` 自动续），用户手动暂停记 `PAUSED`（保持不动）。用一个状态表示"没在跑"会导致自动恢复误伤。
-
-## 为什么需要第 3 份
-
-只读前两份能写出"看起来对"的东西，但会在这些地方出错——它们不是"功能"，而是"接口"：
-
-- 「继续下载」必须 `setState(QUEUED)` + `pump()` **两步**，少一步按钮就没反应
-- 「新建下载」必须 `create` + `startService` + `Engine.start` **三步**，漏掉 service 就没通知
-- 崩溃前在跑的任务记 `RUNNING`，用户手动暂停的记 `PAUSED`，启动时只把前者转 `QUEUED`
-  ——用同一个状态表示"没在跑"会导致自动恢复把手动暂停的任务也拉起来
-
-## 为什么需要第 4 份
-
-里面有 6 个**静默** bug —— 不报错、不崩溃，但结果是错的：
-
-| 坑 | 静默表现 |
-|---|---|
-| 分片进度不落库 | 续传"成功"了，但每段从段首重下，流量翻倍 |
-| 重试时重复计数 | 文件正确，但进度条能显示 120% |
-| 服务器忽略 Range 返回 200 | 整包体写到非零偏移，文件损坏，大小校验还通过 |
-| 预分配文件 | `ls -l` 永远显示完整大小，无法判断进度 |
-| 导出行删除私有副本 | 已完成列表全部显示 `0 B` |
-| `evaluateJavascript` 二次编码 | 嗅探结果解析失败，但不抛异常，只是列表永远空 |
-
-## 一句话判断资料够不够
-
-拿 `acceptance.md` 里的每一条去问："文档里说清楚怎么实现了吗？"
-说不清的就会在那里分叉。
+- 写新功能：先确认 `REQ-*` 存在且已法律审查；没有就停在 G2/G3。
+- 改现有行为：先改 `docs/spec/`，再改代码，再补 `ACC-*` 证据。
+- 发现不一致：登记 `GAP-*`，不要只写在提交信息里。
+- 做验收：需要独立评审者（非作者、未读源码/设计文档），使用盲测包。

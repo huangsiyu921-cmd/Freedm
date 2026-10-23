@@ -23,3 +23,6 @@ captures/
 # 系统
 .DS_Store
 Thumbs.db
+
+# CRRE 证据清单含目标材料元数据（本地审计保存，不入库）
+crre/registry/evidence.csv

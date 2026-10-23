@@ -1,7 +1,13 @@
 # 已知坑与设计权衡
 
+> `DOCUMENT-CLASS: INFORMATIVE`
+> `BASELINE: SPEC-BASELINE-2026-10-23`
+> `AUTHORITY: docs/spec/`（本文不产生规范约束）
+> `LEGAL-STATUS: NOT_REVIEWED`
+
 全部是本次实现/联调中**真实撞到**的问题，按"现象 → 原因 → 处理"记录。
-写着是为了不再踩第二遍，不是为了凑篇幅。
+写着是为了不再踩第二遍，不是为了凑篇幅。对应的规范性错误条件见
+`docs/spec/errors.md`（`ERR-*`）；本文不替代错误条件定义。
 
 ---
 

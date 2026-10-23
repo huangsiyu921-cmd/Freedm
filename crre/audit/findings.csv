@@ -1,0 +1,13 @@
+id,severity,title,evidence,status,fix,owner
+INC-001,Critical,Dirty 规格引用 Clean 文档并含实现状态,6 处 D:\1DM+ 引用 + behavior-spec §7/§8,RESOLVED,删除并隔离到 _quarantine；ui-spec 移回实现端,DIRTY
+INC-002,Critical,原始表达进入候选规格,adblock 原始枚举/类名；progressview 几何与字段；布局 XML,OPEN,加 DIRTY-RAW 限读；待 LEG-001 逐条判定,DIRTY
+INC-003,High,实现端 UI 设计文档误存 Dirty 区,specs/ui-spec.md 标题为 FreeDM,RESOLVED,移至 docs/ui-design.md 并删除 Dirty 副本,DIRTY
+INC-004,Critical,Clean 设计文档与逆向笔记逐条对应,logic-spec §15/§16/§17/§18 与四份 Dirty 笔记对应,BLOCKED,法律判定；必要时独立重设计,CLEAN/COUNSEL
+INC-005,Critical,法律审查从未执行,无 LEG-*；approved/ 为空,BLOCKED,任命 COUNSEL 并签发 LEG-001,OWNER
+INC-006,High,稳定 ID 缺失,acceptance 仅 A/B/P；logic-spec 仅 I1-I4,RESOLVED,建立 docs/spec 与 151 条 ID 注册表,CLEAN
+INC-007,High,规定性与描述性混装,logic-spec 多处“必须”；常量表“必须照抄”,OPEN,新建规范包；历史文档降级 INFORMATIVE,CLEAN
+INC-008,Critical,验证独立性缺失,acceptance 无作者/评审者/独立性声明,BLOCKED,新增 REV 模板与 G5；待 REV-001,AUDIT
+INC-009,Medium,缺口管理缺失,TODO/已知限制散落无状态,RESOLVED,建立 GAP-REGISTER 25 条,AUDIT
+INC-010,Medium,证据保管链缺失,APK/DEX/Frida 无统一哈希清单,OPEN,生成 EVIDENCE-MANIFEST 与 evidence.csv,AUDIT
+INC-011,High,环境隔离不清,acceptance 使用 1DMPlus AVD,OPEN,改用独立 AVD/设备并记录安装包,AUDIT
+INC-012,Critical,Clean 实测数字进入候选规格,behavior-spec §7 的 459/500 KB/s 与 6 段实测,RESOLVED,随 §7/§8 删除并隔离,DIRTY
